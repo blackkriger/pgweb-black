@@ -37,4 +37,4 @@ Prebuilt binaries are published on the [Releases](https://github.com/blackkriger
 
 ## License
 
-The MIT License (MIT). See [LICENSE](LICENSE) for details. Original work done by Dan Sosedoff and the pgweb contributors.
+The MIT License (MIT). See [LICENSE](https://github.com/blackkriger/pgweb-My_games/blob/main/LICENSE) for details. Original work done by Dan Sosedoff and the pgweb contributors.
