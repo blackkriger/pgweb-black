@@ -26,6 +26,9 @@ var (
 	//go:embed sql/table_constraints.sql
 	TableConstraints string
 
+	//go:embed sql/table_columns_meta.sql
+	TableColumnsMeta string
+
 	//go:embed sql/table_info.sql
 	TableInfo string
 

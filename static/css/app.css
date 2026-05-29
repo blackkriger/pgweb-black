@@ -563,6 +563,24 @@
   font-size: 12px;
 }
 
+#results td div.editing {
+  max-width: none;
+  max-height: none;
+  overflow: visible;
+  white-space: normal;
+}
+
+#results td textarea.cell-editor {
+  width: 100%;
+  min-width: 220px;
+  box-sizing: border-box;
+  padding: 3px 5px;
+  border: 1px solid #3874d7;
+  border-radius: 2px;
+  resize: vertical;
+  font-family: Menlo, Monaco, Consolas, monospace;
+}
+
 #results th:first-child,
 #results td:first-child {
   padding-left: 15px;

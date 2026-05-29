@@ -13,4 +13,6 @@ var (
 	errURLRequired          = errors.New("URL parameter is required")
 	errQueryRequired        = errors.New("Query parameter is required")
 	errDatabaseNameRequired = errors.New("Database name is required")
+	errColumnRequired       = errors.New("Column parameter is required")
+	errRowRequired          = errors.New("Row parameter is required")
 )

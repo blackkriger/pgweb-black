@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	neturl "net/url"
@@ -508,6 +509,39 @@ func GetTableIndexes(c *gin.Context) {
 // GetTableConstraints renders a list of database constraints
 func GetTableConstraints(c *gin.Context) {
 	res, err := DB(c).TableConstraints(c.Params.ByName("table"))
+	serveResult(c, res, err)
+}
+
+// UpdateTableRow updates a single cell of a table row, located by primary key
+func UpdateTableRow(c *gin.Context) {
+	column := c.Request.FormValue("column")
+	if column == "" {
+		badRequest(c, errColumnRequired)
+		return
+	}
+
+	raw := c.Request.FormValue("row")
+	if raw == "" {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	var rowValues map[string]*string
+	if err := json.Unmarshal([]byte(raw), &rowValues); err != nil {
+		badRequest(c, fmt.Errorf("invalid row payload: %v", err))
+		return
+	}
+	if len(rowValues) == 0 {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	res, err := DB(c).UpdateTableRow(c.Params.ByName("table"), client.UpdateRowOptions{
+		Column:    column,
+		Value:     c.Request.FormValue("value"),
+		IsNull:    c.Request.FormValue("null") == "true",
+		RowValues: rowValues,
+	})
 	serveResult(c, res, err)
 }
 

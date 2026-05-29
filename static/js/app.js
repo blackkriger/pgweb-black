@@ -1265,6 +1265,9 @@ function bindTableHeaderMenu() {
         case "copy_value":
           copyToClipboard($(context).text());
           break;
+        case "set_null":
+          setCellNull($(context).children("div"));
+          break;
         case "filter_by_value":
           var colIdx   = $(context).data("col");
           var colValue = $(context).text();
@@ -1500,6 +1503,127 @@ function onInputResize(event) {
   resizeInput(computedHeight);
 }
 
+// Read-only value viewer, used outside the browse view where rows are not editable.
+function displayCellValue($div) {
+  $("#content_modal .content").text($div.text());
+  $("#content_modal").show();
+}
+
+// Original value of a cell div: null for SQL NULL, otherwise its text.
+function cellValue($div) {
+  return $div.children("span.null").length ? null : $div.text();
+}
+
+function renderCellValue($div, value) {
+  $div.removeClass("editing");
+  if (value === null) {
+    $div.html("<span class='null'>null</span>");
+  } else {
+    $div.text(value);
+  }
+}
+
+// Full original row as a column -> value map, used by the backend to locate the row by its primary key.
+function collectRowValues($tr) {
+  var values = {};
+  $tr.children("td[data-col]").each(function() {
+    var name = $("#results_header th").eq($(this).data("col")).data("name");
+    if (name != null) values[name] = cellValue($(this).children("div"));
+  });
+  return values;
+}
+
+function saveCellValue($div, column, value, isNull, rowValues, original) {
+  var params = {
+    column: column,
+    value:  value,
+    null:   isNull ? "true" : "false",
+    row:    JSON.stringify(rowValues)
+  };
+
+  apiCall("post", "/tables/" + $("#results").data("table") + "/update", params, function(resp) {
+    if (resp && resp.error) {
+      showErrorBanner("Update failed: " + resp.error);
+      renderCellValue($div, original);
+      return;
+    }
+
+    var affected = (resp && resp.rows && resp.rows[0]) ? resp.rows[0][0] : 0;
+    if (!affected) {
+      showErrorBanner("No rows updated — the row may have changed. Refresh and try again.");
+      renderCellValue($div, original);
+      return;
+    }
+
+    renderCellValue($div, isNull ? null : value);
+  });
+}
+
+function setCellNull($div) {
+  if ($("#results").data("mode") != "browse") return;
+
+  var $td = $div.parent();
+  var column = $("#results_header th").eq($td.data("col")).data("name");
+  if (column == null || cellValue($div) === null) return;
+
+  saveCellValue($div, column, "", true, collectRowValues($td.closest("tr")), cellValue($div));
+}
+
+function startCellEdit($div) {
+  if ($("#results").data("mode") != "browse") {
+    displayCellValue($div);
+    return;
+  }
+  if ($div.children("textarea").length) return;
+
+  var $td = $div.parent();
+  var column = $("#results_header th").eq($td.data("col")).data("name");
+  if (column == null) return;
+
+  var original  = cellValue($div);
+  var rowValues = collectRowValues($td.closest("tr"));
+  var text      = original === null ? "" : original;
+
+  var $editor = $("<textarea class='cell-editor' spellcheck='false'></textarea>")
+    .attr("rows", Math.min(8, text.split("\n").length))
+    .val(text);
+
+  $div.addClass("editing").html($editor);
+  $editor.focus()[0].select();
+
+  var settled = false;
+
+  function cancel() {
+    if (settled) return;
+    settled = true;
+    renderCellValue($div, original);
+  }
+
+  function commit() {
+    if (settled) return;
+    settled = true;
+
+    var next = $editor.val();
+    if ((original === null && next === "") || next === original) {
+      renderCellValue($div, original);
+      return;
+    }
+    saveCellValue($div, column, next, false, rowValues, original);
+  }
+
+  $editor.on("keydown", function(e) {
+    if (e.keyCode == 13 && !e.shiftKey) {
+      e.preventDefault();
+      commit();
+    } else if (e.keyCode == 27) {
+      e.preventDefault();
+      cancel();
+    }
+  });
+
+  $editor.on("blur", commit);
+}
+
 function bindContentModalEvents() {
   var contentModal = document.getElementById("content_modal");
 
@@ -1522,12 +1646,8 @@ function bindContentModalEvents() {
   });
 
   $("#results").on("dblclick", "td > div", function() {
-    var value = unescapeHtml($(this).html());
-    if (!value) return;
-
-    $("#content_modal pre").html(value);
-    $("#content_modal").show();
-  })
+    startCellEdit($(this));
+  });
 }
 
 $(document).ready(function() {
