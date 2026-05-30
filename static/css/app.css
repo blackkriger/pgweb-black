@@ -1238,8 +1238,9 @@ body.office98 #close_connection {
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
 
-/* Both custom themes: drop the editor's top padding so the query field sits
-   flush under the top menu (otherwise the padding shows as a strip of the
-   theme background between the menu and the editor). */
+/* Both custom themes: drop the editor's top padding so the query field sits flush under the top menu. */
 body.bios #input .input-wrapper,
 body.office98 #input .input-wrapper { padding-top: 0; }
+/* And let the ACE editor fill the wrapper */
+body.bios #input .input-wrapper #custom_query,
+body.office98 #input .input-wrapper #custom_query { height: 100%; }
