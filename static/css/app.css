@@ -290,7 +290,7 @@
 
 #input .input-wrapper {
   height: 250px;
-  padding-top: 12px;
+  padding-top: 0;
 }
 
 #input_resize_handler {
@@ -713,7 +713,7 @@
 /* -------------------------------------------------------------------------- */
 
 #custom_query {
-  height: 238px;
+  height: 100%;
 }
 
 #connection_window {
@@ -1237,10 +1237,3 @@ body.office98 #close_connection {
 /* ace gutter */
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
-
-/* Both custom themes: drop the editor's top padding so the query field sits flush under the top menu. */
-body.bios #input .input-wrapper,
-body.office98 #input .input-wrapper { padding-top: 0; }
-/* And let the ACE editor fill the wrapper */
-body.bios #input .input-wrapper #custom_query,
-body.office98 #input .input-wrapper #custom_query { height: 100%; }
