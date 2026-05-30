@@ -8,6 +8,9 @@
   <link rel="stylesheet" href="static/css/bootstrap.css"></link>
   <link rel="stylesheet" href="static/css/font-awesome.css"></link>
   <link rel="stylesheet" href="static/css/app.css"></link>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=VT323&display=swap">
   <link rel="icon" type="image/x-icon" href="static/img/icon.ico" />
   <script type="text/javascript" src="static/js/jquery.js"></script>
   <script type="text/javascript" src="static/js/ace.js"></script>
@@ -35,6 +38,7 @@
       </ul>
 
       <div class="connection-actions">
+        <a href="#" id="toggle_theme" class="btn btn-default btn-sm" title="Toggle BIOS theme">BIOS</a>
         <a href="#" id="edit_connection" class="btn btn-default btn-sm"><i class="fa fa-database"></i> Connect</a>
         <a href="#" id="close_connection" class="btn btn-default btn-sm">Disconnect</a>
       </div>
@@ -344,8 +348,10 @@
     <ul class="dropdown-menu" role="menu">
       <li><a href="#" data-action="display_value">Display Value</a></li>
       <li><a href="#" data-action="copy_value">Copy Value</a></li>
-      <li><a href="#" data-action="set_null">Set NULL</a></li>
       <li><a href="#" data-action="filter_by_value">Filter Rows By Value</a></li>
+      <li class="divider"></li>
+      <li><a href="#" data-action="set_null">Set NULL</a></li>
+      <li><a href="#" data-action="delete_row">Delete Row…</a></li>
     </ul>
   </div>
   <div id="error_banner"></div>

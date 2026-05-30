@@ -932,3 +932,123 @@
 .ace_autocomplete .ace_active-line {
   background: #eee !important;
 }
+
+/* ============================================================================
+   My_games PS1 BIOS theme. Opt-in via the `bios` class on <body> (toggled by #toggle_theme, persisted in localStorage). 
+   ============================================================================ */
+body.bios {
+  --bg:     #07073a;
+  --panel:  #101055;
+  --panel2: #18186e;
+  --ink:    #e4e4ff;
+  --dim:    #9aa0db;
+  --gold:   #f5c451;
+  --gold2:  #ffd970;
+  --line:   #35358f;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: 'VT323', 'Consolas', 'Courier New', monospace;
+}
+
+body.bios #main,
+body.bios #body,
+body.bios #output { background: var(--bg); }
+
+/* top nav */
+body.bios #nav { background: var(--panel); border-bottom: 2px solid var(--gold); }
+body.bios #nav ul li { color: var(--gold); letter-spacing: .05em; }
+body.bios #nav ul li:hover { color: var(--gold2); }
+body.bios #nav ul li.selected,
+body.bios #nav ul li.selected:before { background: var(--gold); color: var(--bg); }
+
+/* sidebar */
+body.bios #sidebar { background: var(--panel); border-right: 1px solid var(--line); }
+body.bios #sidebar .current-database { background: var(--panel2); color: var(--gold); border-bottom: 1px solid var(--gold); }
+body.bios #sidebar .current-database input.typeahead { background: var(--panel2); color: var(--ink); }
+body.bios #sidebar .objects-search .wrap { border-bottom: 1px solid var(--line); }
+body.bios #sidebar .objects-search input[type="text"] { color: var(--ink); }
+body.bios #sidebar .objects-search i.fa-search,
+body.bios #sidebar .objects-search i.fa-times-circle { color: var(--dim); }
+body.bios #sidebar div.table-information .title { color: var(--gold); border-top: 1px solid var(--line); }
+body.bios #sidebar div.table-information .lines .line,
+body.bios #sidebar div.table-information .lines .line span { color: var(--dim) !important; }
+
+/* object tree */
+body.bios .schema .schema-name,
+body.bios .schema .schema-container .schema-group .schema-group-title { color: var(--ink); }
+body.bios .schema .schema-container .schema-group ul li { color: var(--dim); }
+body.bios .schema .schema-container .schema-group ul li:hover { background: var(--panel2); color: var(--gold); }
+body.bios .schema .schema-container .schema-group ul li.active { background: var(--gold); color: var(--bg); }
+body.bios .schema .schema-container .schema-group ul li.active i { color: var(--bg); }
+body.bios .schema i,
+body.bios .schema .schema-group-count { color: var(--dim); }
+
+/* query actions bar + buttons */
+body.bios #input .actions { background: var(--panel); border-top: 1px solid var(--line); }
+body.bios #input .actions #result-rows-count,
+body.bios #input .actions #query_progress { color: var(--dim); }
+body.bios #input .actions .btn { color: var(--gold); border-color: var(--gold); background: transparent; }
+body.bios #input .actions .btn:hover { color: var(--bg) !important; background: var(--gold) !important; border-color: var(--gold); }
+body.bios #input_resize_handler { background: var(--line); }
+
+/* pagination + filters */
+body.bios #pagination { background: var(--panel); border-bottom: 1px solid var(--gold); box-shadow: none; }
+body.bios #pagination .filters span,
+body.bios #pagination .current-page { color: var(--dim); }
+body.bios #pagination .filters input,
+body.bios #pagination .filters select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); }
+body.bios #pagination .btn-default { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+body.bios #pagination .filters .btn-primary { background: transparent; color: var(--gold); border-color: var(--gold); }
+
+/* results table */
+body.bios #results th { background: var(--panel2); color: var(--gold); border-bottom: 1px solid var(--gold); }
+body.bios #results th:hover,
+body.bios #results[data-mode="browse"] th:hover,
+body.bios #results th.active { background: var(--line); }
+body.bios #results td { color: var(--ink); }
+body.bios #results tr:nth-child(odd) > td { background: var(--bg); }
+body.bios #results tr:nth-child(even) > td { background: var(--panel); }
+body.bios #results tbody tr { border-bottom: 1px solid var(--line); }
+body.bios #results tbody tr:hover td { background: var(--panel2); }
+body.bios #results tr.selected td { background: var(--gold) !important; color: var(--bg) !important; }
+body.bios #results td div span.null { color: var(--dim); }
+body.bios #results td textarea.cell-editor { background: var(--bg); color: var(--ink) !important; border-color: var(--gold); }
+
+/* cell value modal */
+body.bios #content_modal { background: var(--panel); border: 2px solid var(--gold); box-shadow: 0 0 24px rgba(245, 196, 81, 0.35); }
+body.bios #content_modal .title { background: var(--panel2); color: var(--gold); }
+body.bios #content_modal .content { background: var(--panel); color: var(--ink); }
+body.bios #content_modal .actions .fa { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+
+/* context menus */
+body.bios .dropdown-menu { background: var(--panel); border: 1px solid var(--gold); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
+body.bios .dropdown-menu > li > a { color: var(--ink); }
+body.bios .dropdown-menu > li > a:hover,
+body.bios .dropdown-menu > li > a:focus { background: var(--gold); color: var(--bg); }
+body.bios .dropdown-menu .divider { background: var(--line); }
+
+/* error banner */
+body.bios #error_banner { background: #b3122e; color: #fff; }
+
+/* connection screen */
+body.bios #connection_window { background: var(--bg); color: var(--ink); }
+body.bios .connection-settings .header h1 { color: var(--gold); font-family: 'Cinzel', 'VT323', serif; text-shadow: 0 0 14px rgba(245, 196, 81, 0.45); }
+body.bios .connection-settings .header .version,
+body.bios .connection-settings .connection-ssh-group h3 { color: var(--dim); }
+body.bios .connection-settings form { background: var(--panel); border: 1px solid var(--gold); }
+body.bios .connection-settings label,
+body.bios .connection-settings .control-label { color: var(--ink); }
+body.bios .connection-settings .form-control { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
+body.bios .connection-settings .help-block { color: var(--dim); }
+body.bios .connection-group-switch .btn { background: transparent; color: var(--gold); border-color: var(--gold); }
+body.bios .connection-group-switch .btn.active { background: var(--gold); color: var(--bg); }
+body.bios .open-connection { background: var(--gold); color: var(--bg); border-color: var(--gold); }
+
+/* top-right action buttons + theme toggle */
+body.bios #toggle_theme,
+body.bios #edit_connection,
+body.bios #close_connection { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
+
+/* ace gutter (editor body kept light so the light syntax theme stays readable) */
+body.bios .ace_gutter,
+body.bios .ace_gutter-cell { background: var(--panel) !important; color: var(--dim); }

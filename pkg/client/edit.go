@@ -21,15 +21,8 @@ func (client *Client) TableColumnsMeta(table string) (*Result, error) {
 	return client.query(statements.TableColumnsMeta, schema, name)
 }
 
-// UpdateTableRow updates a single column of a row identified by its primary key. The new value and key values are passed as bound parameters and cast to their own column types, so the statement is safe against injection and type mismatches. Editing requires the table to expose a primary key.
-func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Result, error) {
-	schema, name := getSchemaAndTable(table)
-
-	meta, err := client.TableColumnsMeta(table)
-	if err != nil {
-		return nil, err
-	}
-
+// parseColumnsMeta splits a TableColumnsMeta result into a column->type map and the ordered list of primary-key columns.
+func parseColumnsMeta(meta *Result) (map[string]string, []string) {
 	types := map[string]string{}
 	primaryKey := []string{}
 	for _, row := range meta.Rows {
@@ -42,7 +35,34 @@ func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Resu
 			primaryKey = append(primaryKey, col)
 		}
 	}
+	return types, primaryKey
+}
 
+// buildPrimaryKeyMatch builds the parameterized WHERE conditions that match a single row by its primary key, reading key values from rowValues. Placeholder numbering starts at startIdx; values are cast to their own column types.
+func buildPrimaryKeyMatch(types map[string]string, primaryKey []string, rowValues map[string]*string, startIdx int) (string, []interface{}, error) {
+	conds := make([]string, 0, len(primaryKey))
+	args := make([]interface{}, 0, len(primaryKey))
+	for i, col := range primaryKey {
+		val, ok := rowValues[col]
+		if !ok || val == nil {
+			return "", nil, fmt.Errorf("missing primary key value for column %q", col)
+		}
+		args = append(args, *val)
+		conds = append(conds, fmt.Sprintf(`"%s" = $%d::%s`, col, startIdx+i, types[col]))
+	}
+	return strings.Join(conds, " AND "), args, nil
+}
+
+// UpdateTableRow updates a single column of a row identified by its primary key. The new value and key values are passed as bound parameters and cast to their own column types, so the statement is safe against injection and type mismatches. Editing requires the table to expose a primary key.
+func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Result, error) {
+	schema, name := getSchemaAndTable(table)
+
+	meta, err := client.TableColumnsMeta(table)
+	if err != nil {
+		return nil, err
+	}
+
+	types, primaryKey := parseColumnsMeta(meta)
 	if len(types) == 0 {
 		return nil, fmt.Errorf("table %q does not exist", table)
 	}
@@ -54,27 +74,44 @@ func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Resu
 	}
 
 	args := []interface{}{}
-
 	setClause := fmt.Sprintf(`"%s" = NULL`, opts.Column)
 	if !opts.IsNull {
 		args = append(args, opts.Value)
 		setClause = fmt.Sprintf(`"%s" = $%d::%s`, opts.Column, len(args), types[opts.Column])
 	}
 
-	conditions := make([]string, 0, len(primaryKey))
-	for _, col := range primaryKey {
-		val, ok := opts.RowValues[col]
-		if !ok || val == nil {
-			return nil, fmt.Errorf("missing primary key value for column %q", col)
-		}
-		args = append(args, *val)
-		conditions = append(conditions, fmt.Sprintf(`"%s" = $%d::%s`, col, len(args), types[col]))
+	where, whereArgs, err := buildPrimaryKeyMatch(types, primaryKey, opts.RowValues, len(args)+1)
+	if err != nil {
+		return nil, err
+	}
+	args = append(args, whereArgs...)
+
+	sql := fmt.Sprintf(`UPDATE "%s"."%s" SET %s WHERE %s`, schema, name, setClause, where)
+	return client.query(sql, args...)
+}
+
+// DeleteTableRow deletes a row identified by its primary key, read from rowValues (the original row as displayed). Key values are bound and cast to their column types. Deleting requires the table to expose a primary key.
+func (client *Client) DeleteTableRow(table string, rowValues map[string]*string) (*Result, error) {
+	schema, name := getSchemaAndTable(table)
+
+	meta, err := client.TableColumnsMeta(table)
+	if err != nil {
+		return nil, err
 	}
 
-	sql := fmt.Sprintf(
-		`UPDATE "%s"."%s" SET %s WHERE %s`,
-		schema, name, setClause, strings.Join(conditions, " AND "),
-	)
+	types, primaryKey := parseColumnsMeta(meta)
+	if len(types) == 0 {
+		return nil, fmt.Errorf("table %q does not exist", table)
+	}
+	if len(primaryKey) == 0 {
+		return nil, fmt.Errorf("cannot delete rows: table %q has no primary key", table)
+	}
 
+	where, args, err := buildPrimaryKeyMatch(types, primaryKey, rowValues, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s`, schema, name, where)
 	return client.query(sql, args...)
 }

@@ -1268,6 +1268,9 @@ function bindTableHeaderMenu() {
         case "set_null":
           setCellNull($(context).children("div"));
           break;
+        case "delete_row":
+          deleteRow($(context).closest("tr"));
+          break;
         case "filter_by_value":
           var colIdx   = $(context).data("col");
           var colValue = $(context).text();
@@ -1569,6 +1572,25 @@ function setCellNull($div) {
   saveCellValue($div, column, "", true, collectRowValues($td.closest("tr")), cellValue($div));
 }
 
+function deleteRow($tr) {
+  if ($("#results").data("mode") != "browse") return;
+  if (!confirm("Delete this row? This cannot be undone.")) return;
+
+  var rowValues = collectRowValues($tr);
+  apiCall("post", "/tables/" + $("#results").data("table") + "/delete", { row: JSON.stringify(rowValues) }, function(resp) {
+    if (resp && resp.error) {
+      showErrorBanner("Delete failed: " + resp.error);
+      return;
+    }
+    var affected = (resp && resp.rows && resp.rows[0]) ? resp.rows[0][0] : 0;
+    if (!affected) {
+      showErrorBanner("No rows deleted — the row may have changed. Refresh and try again.");
+      return;
+    }
+    $tr.remove();
+  });
+}
+
 function startCellEdit($div) {
   if ($("#results").data("mode") != "browse") {
     displayCellValue($div);
@@ -1624,6 +1646,13 @@ function startCellEdit($div) {
   $editor.on("blur", commit);
 }
 
+// My_games PS1 BIOS theme 
+function applyTheme() {
+  var bios = localStorage.getItem("pgweb_theme") === "bios";
+  $("body").toggleClass("bios", bios);
+  $("#toggle_theme").text(bios ? "Classic" : "BIOS");
+}
+
 function bindContentModalEvents() {
   var contentModal = document.getElementById("content_modal");
 
@@ -1653,6 +1682,14 @@ function bindContentModalEvents() {
 $(document).ready(function() {
   bindInputResizeEvents();
   bindContentModalEvents();
+
+  applyTheme();
+  $("#toggle_theme").on("click", function(e) {
+    e.preventDefault();
+    var bios = localStorage.getItem("pgweb_theme") === "bios";
+    localStorage.setItem("pgweb_theme", bios ? "classic" : "bios");
+    applyTheme();
+  });
 
   $("#table_content").on("click",     function() { showTableContent();     });
   $("#table_structure").on("click",   function() { showTableStructure();   });

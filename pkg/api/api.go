@@ -545,6 +545,28 @@ func UpdateTableRow(c *gin.Context) {
 	serveResult(c, res, err)
 }
 
+// DeleteTableRow deletes a table row, located by primary key
+func DeleteTableRow(c *gin.Context) {
+	raw := c.Request.FormValue("row")
+	if raw == "" {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	var rowValues map[string]*string
+	if err := json.Unmarshal([]byte(raw), &rowValues); err != nil {
+		badRequest(c, fmt.Errorf("invalid row payload: %v", err))
+		return
+	}
+	if len(rowValues) == 0 {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	res, err := DB(c).DeleteTableRow(c.Params.ByName("table"), rowValues)
+	serveResult(c, res, err)
+}
+
 // GetTablesStats renders data sizes and estimated rows for all tables in the database
 func GetTablesStats(c *gin.Context) {
 	db := DB(c)
