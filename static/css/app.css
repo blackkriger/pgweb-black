@@ -995,6 +995,9 @@ body.bios #input .actions #result-rows-count,
 body.bios #input .actions #query_progress { color: var(--dim); }
 body.bios #input .actions .btn { color: var(--ink); border-color: var(--gold); background: linear-gradient(180deg, rgba(232, 194, 103, 0.18) 0%, rgba(232, 194, 103, 0.04) 100%); }
 body.bios #input .actions .btn:hover { color: var(--ink) !important; background: linear-gradient(180deg, rgba(253, 226, 155, 0.28) 0%, rgba(232, 194, 103, 0.1) 100%) !important; border-color: var(--gold2); }
+/* PSone press feedback — every themed button nudges down on click. */
+body.bios .btn { transition: transform 80ms ease, background 120ms ease, border-color 120ms ease; }
+body.bios .btn:active { transform: translateY(1px); }
 body.bios #input_resize_handler { background: var(--line); }
 
 /* pagination + filters */
@@ -1127,7 +1130,18 @@ body.office98 #input .actions .btn {
   box-shadow: inset 1px 1px 0 0 var(--hi-soft), inset -1px -1px 0 0 var(--sh);
 }
 body.office98 #input .actions .btn:hover { color: #000; background: var(--face) !important; border-color: var(--hi) var(--dk) var(--dk) var(--hi); }
-body.office98 #input .actions .btn:active { border-color: var(--dk) var(--hi) var(--hi) var(--dk); box-shadow: inset 1px 1px 0 0 var(--sh), inset -1px -1px 0 0 var(--hi-soft); }
+/* Win98 press feedback — inverted bevel on click, for every themed button. Each group is named so the :active rule outranks its raised (ID-scoped) rule. */
+body.office98 #input .actions .btn:active,
+body.office98 #pagination .btn-default:active,
+body.office98 #pagination .filters .btn-primary:active,
+body.office98 .connection-group-switch .btn:active,
+body.office98 .open-connection:active,
+body.office98 #toggle_theme:active,
+body.office98 #edit_connection:active,
+body.office98 #close_connection:active {
+  border-color: var(--dk) var(--hi) var(--hi) var(--dk);
+  box-shadow: inset 1px 1px 0 0 var(--sh), inset -1px -1px 0 0 var(--hi-soft);
+}
 body.office98 #input_resize_handler { background: var(--sh); }
 
 /* pagination + filters */
@@ -1223,3 +1237,9 @@ body.office98 #close_connection {
 /* ace gutter */
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
+
+/* Both custom themes: drop the editor's top padding so the query field sits
+   flush under the top menu (otherwise the padding shows as a strip of the
+   theme background between the menu and the editor). */
+body.bios #input .input-wrapper,
+body.office98 #input .input-wrapper { padding-top: 0; }

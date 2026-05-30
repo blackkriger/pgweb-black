@@ -1892,6 +1892,8 @@ $(document).ready(function() {
 
   $("#current_database").on("click", function(e) {
     apiCall("get", "/databases", {}, function(resp) {
+      // Hide maintenance databases we never browse from the switch list.
+      if (Array.isArray(resp)) resp = resp.filter(function(d) { return d !== "postgres"; });
       toggleDatabaseSearch();
       enableDatabaseSearch(resp);
     });
