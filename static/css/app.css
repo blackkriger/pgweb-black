@@ -290,7 +290,7 @@
 
 #input .input-wrapper {
   height: 250px;
-  padding-top: 0;
+  padding-top: 12px;
 }
 
 #input_resize_handler {
@@ -713,7 +713,7 @@
 /* -------------------------------------------------------------------------- */
 
 #custom_query {
-  height: 100%;
+  height: 238px;
 }
 
 #connection_window {
@@ -1237,3 +1237,11 @@ body.office98 #close_connection {
 /* ace gutter */
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
+
+/* Themed skins only: drop the editor's 12px top padding and let the editor fill
+   the wrapper, so it sits flush under the menu with no theme-background strip.
+   Classic keeps the original padding (the gap is invisible on its white bg). */
+body.bios #input .input-wrapper,
+body.office98 #input .input-wrapper { padding-top: 0; }
+body.bios #input .input-wrapper #custom_query,
+body.office98 #input .input-wrapper #custom_query { height: 100%; }
