@@ -947,7 +947,7 @@ body.bios {
   --line:   #35358f;
   background: var(--bg);
   color: var(--ink);
-  font-family: 'VT323', 'Consolas', 'Courier New', monospace;
+  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
 }
 
 body.bios #main,
@@ -1032,7 +1032,7 @@ body.bios #error_banner { background: #b3122e; color: #fff; }
 
 /* connection screen */
 body.bios #connection_window { background: var(--bg); color: var(--ink); }
-body.bios .connection-settings .header h1 { color: var(--gold); font-family: 'Cinzel', 'VT323', serif; text-shadow: 0 0 14px rgba(245, 196, 81, 0.45); }
+body.bios .connection-settings .header h1 { color: var(--gold); font-family: 'Cinzel', 'Times New Roman', serif; text-shadow: 0 0 14px rgba(245, 196, 81, 0.45); }
 body.bios .connection-settings .header .version,
 body.bios .connection-settings .connection-ssh-group h3 { color: var(--dim); }
 body.bios .connection-settings form { background: var(--panel); border: 1px solid var(--gold); }
