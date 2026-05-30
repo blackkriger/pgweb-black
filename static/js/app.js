@@ -1646,11 +1646,20 @@ function startCellEdit($div) {
   $editor.on("blur", commit);
 }
 
-// My_games PS1 BIOS theme 
+// Theme cycling. Each theme id doubles as the <body> class ("classic" = none). The button shows the active theme; clicking advances to the next one. The choice is persisted in localStorage.
+var THEMES = ["classic", "bios", "office98"];
+var THEME_LABELS = { classic: "Classic", bios: "PS1 BIOS", office98: "Office 98" };
+
+function currentTheme() {
+  var t = localStorage.getItem("pgweb_theme") || "classic";
+  return THEMES.indexOf(t) >= 0 ? t : "classic";
+}
+
 function applyTheme() {
-  var bios = localStorage.getItem("pgweb_theme") === "bios";
-  $("body").toggleClass("bios", bios);
-  $("#toggle_theme").text(bios ? "Classic" : "BIOS");
+  var t = currentTheme();
+  $("body").removeClass("bios office98");
+  if (t !== "classic") $("body").addClass(t);
+  $("#toggle_theme").text(THEME_LABELS[t]);
 }
 
 function bindContentModalEvents() {
@@ -1686,8 +1695,8 @@ $(document).ready(function() {
   applyTheme();
   $("#toggle_theme").on("click", function(e) {
     e.preventDefault();
-    var bios = localStorage.getItem("pgweb_theme") === "bios";
-    localStorage.setItem("pgweb_theme", bios ? "classic" : "bios");
+    var next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
+    localStorage.setItem("pgweb_theme", next);
     applyTheme();
   });
 
