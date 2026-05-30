@@ -487,9 +487,9 @@ function buildTable(results, sortColumn, sortOrder, options) {
 }
 
 function setCurrentTab(id) {
-  // Pagination should only be visible on rows tab
+  // Pagination + query bar are only for the rows tab
   if (id != "table_content") {
-    $("#body").removeClass("with-pagination");
+    $("#body").removeClass("with-pagination").removeClass("with-rows-query");
   }
 
   $("#nav ul li.selected").removeClass("selected");
@@ -641,13 +641,34 @@ function showTableContent(sortColumn, sortOrder) {
 
   getTableRows(name, opts, function(data) {
     $("#input").hide();
-    $("#body").prop("class", "with-pagination");
+    $("#body").prop("class", "with-pagination with-rows-query");
+    $("#rows_query_sql").val(buildBrowseQuery(name, opts));
 
     buildTable(data, sortColumn, sortOrder);
     setCurrentTab("table_content");
     updatePaginator(data.pagination);
 
     $("#results").data("mode", "browse").data("table", name);
+  });
+}
+
+// Reconstruct the SELECT that the rows view runs (minus the auto LIMIT/OFFSET) so it can be shown and edited in the query bar.
+function buildBrowseQuery(table, opts) {
+  var sql = "SELECT * FROM " + getQuotedSchemaTableName(table);
+  if (opts.where) sql += " WHERE " + opts.where;
+  if (opts.sort_column) sql += ' ORDER BY "' + opts.sort_column + '" ' + (opts.sort_order || "ASC");
+  return sql;
+}
+
+// Run the (possibly edited) query bar SQL in place: render its rows and keep the bar. It's an arbitrary query now, so drop pagination/filters and mark the result as a query (which disables the browse-only cell edit/delete).
+function runRowsQuery() {
+  var sql = $.trim($("#rows_query_sql").val());
+  if (!sql) return;
+
+  executeQuery(sql, function(data) {
+    buildTable(data);
+    $("#body").prop("class", "with-rows-query");
+    $("#results").data("mode", "query");
   });
 }
 
@@ -1698,6 +1719,11 @@ $(document).ready(function() {
     var next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
     localStorage.setItem("pgweb_theme", next);
     applyTheme();
+  });
+
+  $("#rows_query_run").on("click", runRowsQuery);
+  $("#rows_query_sql").on("keydown", function(e) {
+    if (e.keyCode == 13) { e.preventDefault(); runRowsQuery(); }
   });
 
   $("#table_content").on("click",     function() { showTableContent();     });

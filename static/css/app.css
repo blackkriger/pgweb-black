@@ -1238,10 +1238,67 @@ body.office98 #close_connection {
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
 
-/* Themed skins only: drop the editor's 12px top padding and let the editor fill
-   the wrapper, so it sits flush under the menu with no theme-background strip.
-   Classic keeps the original padding (the gap is invisible on its white bg). */
+/* Themed skins only: lay the query input area out with absolute positioning so the editor fills the wrapper and the actions bar is pinned to the bottom — together they tile #input with no theme-background gaps, regardless of the pixel heights resizeInput sets (inline heights are overridden). Classic keeps the original flow layout untouched. The #input is position:relative already. */
 body.bios #input .input-wrapper,
-body.office98 #input .input-wrapper { padding-top: 0; }
+body.office98 #input .input-wrapper {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 50px; /* 50px = actions bar height */
+  height: auto !important;
+  padding-top: 0;
+}
+body.bios #input .actions,
+body.office98 #input .actions {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+}
 body.bios #input .input-wrapper #custom_query,
-body.office98 #input .input-wrapper #custom_query { height: 100%; }
+body.office98 #input .input-wrapper #custom_query {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  height: auto !important;
+}
+
+/* ============================================================================
+   Editable query bar for the Rows view (phpMyAdmin-style inline edit). Sits above the pagination; shows the generated SELECT, editable, with a Run that re-executes it in place. Visibility is driven by the `with-rows-query` body class (added while browsing, dropped on tab switch), like `with-pagination`.
+   ============================================================================ */
+#rows_query {
+  display: none;
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 40px;
+  padding: 6px 10px;
+  box-sizing: border-box;
+  background: #fff;
+  border-bottom: 1px solid #eee;
+  align-items: center;
+  gap: 8px;
+  z-index: 2;
+}
+.with-rows-query #rows_query { display: flex; }
+#rows_query input {
+  flex: 1 1 auto;
+  height: 28px;
+  font-family: Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  padding: 0 8px;
+  border: 1px solid #ccc;
+  outline: none;
+  color: #000;
+  background: #fff;
+}
+#rows_query .btn { flex: 0 0 auto; }
+.with-rows-query.with-pagination #pagination { top: 40px; }
+.with-rows-query.with-pagination #output { top: 90px !important; }
+.with-rows-query:not(.with-pagination) #output { top: 40px !important; }
+
+/* BIOS bar */
+body.bios #rows_query { background: rgba(7, 7, 36, 0.82); border-bottom: 1px solid var(--gold); }
+body.bios #rows_query input { background: rgba(0, 0, 0, 0.5); color: var(--ink); border: 1px solid var(--line); }
+body.bios #rows_query .btn { color: var(--ink); border: 1px solid var(--gold); background: linear-gradient(180deg, rgba(232, 194, 103, 0.18) 0%, rgba(232, 194, 103, 0.04) 100%); }
+body.bios #rows_query .btn:hover { background: linear-gradient(180deg, rgba(253, 226, 155, 0.28) 0%, rgba(232, 194, 103, 0.1) 100%); border-color: var(--gold2); }
+
+/* Office 98 bar */
+body.office98 #rows_query { background: var(--face); border-bottom: 1px solid var(--dk); box-shadow: inset 0 1px 0 0 var(--hi); }
+body.office98 #rows_query input { background: #fff; color: #000; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); }
+body.office98 #rows_query .btn { color: #000; background: var(--face); border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); box-shadow: inset 1px 1px 0 0 var(--hi-soft), inset -1px -1px 0 0 var(--sh); }
+body.office98 #rows_query .btn:active { border-color: var(--dk) var(--hi) var(--hi) var(--dk); box-shadow: inset 1px 1px 0 0 var(--sh), inset -1px -1px 0 0 var(--hi-soft); }
