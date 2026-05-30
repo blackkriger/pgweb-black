@@ -642,7 +642,12 @@ function showTableContent(sortColumn, sortOrder) {
   getTableRows(name, opts, function(data) {
     $("#input").hide();
     $("#body").prop("class", "with-pagination with-rows-query");
-    $("#rows_query_sql").val(buildBrowseQuery(name, opts));
+    if (rowsEditor) {
+      rowsEditor.setValue(buildBrowseQuery(name, opts));
+      rowsEditor.clearSelection();
+      rowsEditor.resize();
+      layoutRowsQuery();
+    }
 
     buildTable(data, sortColumn, sortOrder);
     setCurrentTab("table_content");
@@ -660,14 +665,13 @@ function buildBrowseQuery(table, opts) {
   return sql;
 }
 
-// Run the (possibly edited) query bar SQL in place: render its rows and keep the bar. It's an arbitrary query now, so drop pagination/filters and mark the result as a query (which disables the browse-only cell edit/delete).
+// Run the (possibly edited) query bar SQL in place: render its rows, keeping the bar and pagination/filters visible. Mark the result as a query so the browse-only cell edit/delete stay disabled for arbitrary output.
 function runRowsQuery() {
-  var sql = $.trim($("#rows_query_sql").val());
+  var sql = rowsEditor ? $.trim(rowsEditor.getValue()) : "";
   if (!sql) return;
 
   executeQuery(sql, function(data) {
     buildTable(data);
-    $("#body").prop("class", "with-rows-query");
     $("#results").data("mode", "query");
   });
 }
@@ -1047,6 +1051,8 @@ function buildTableFilters(name, type) {
   });
 }
 
+var rowsEditor = null;
+
 var objectAutocompleter = {
   getCompletions: function (editor, session, pos, prefix, callback) {
     callback(null, autocompleteObjects);
@@ -1105,6 +1111,49 @@ function initEditor() {
     editor.setValue(query);
     editor.clearSelection();
   }
+
+  initRowsEditor();
+}
+
+// ACE editor for the Rows-view query bar — same SQL mode + autocompleter as the main editor 
+function initRowsEditor() {
+  rowsEditor = ace.edit("rows_query_editor");
+  rowsEditor.setOptions({
+    enableBasicAutocompletion: true,
+    enableLiveAutocompletion: true,
+  });
+  rowsEditor.completers.push(objectAutocompleter);
+  rowsEditor.setFontSize(13);
+  rowsEditor.setTheme("ace/theme/tomorrow");
+  rowsEditor.setShowPrintMargin(false);
+  rowsEditor.setHighlightActiveLine(false);
+  rowsEditor.renderer.setShowGutter(false);
+  rowsEditor.getSession().setMode("ace/mode/pgsql");
+  rowsEditor.getSession().setUseWrapMode(false);
+
+  rowsEditor.commands.addCommand({
+    name: "run_rows_query",
+    bindKey: { win: "Return|Ctrl-Enter", mac: "Return|Command-Enter" },
+    exec: function(ed) {
+      if (ed.completer && ed.completer.activated) return false;
+      runRowsQuery();
+    }
+  });
+
+  // The editor has a CSS resize grip (bottom-right) 
+  if (window.ResizeObserver) {
+    new ResizeObserver(function() {
+      rowsEditor.resize();
+      layoutRowsQuery();
+    }).observe(document.getElementById("rows_query_editor"));
+  }
+}
+
+// Publish the query bar's height as --rq-h so the CSS offsets for pagination and output follow it as it's resized 
+function layoutRowsQuery() {
+  var $rq = $("#rows_query");
+  if (!$rq.is(":visible")) return;
+  document.getElementById("body").style.setProperty("--rq-h", ($rq.outerHeight() || 40) + "px");
 }
 
 function addShortcutTooltips() {
@@ -1485,7 +1534,7 @@ function checkInputSize() {
 function resizeInput(height) {
   if (height < 100) height = 100;
 
-  var diff = 50; // actions box
+  var diff = 50 + 12; // actions box + padding (classic layout); themes ignore it (absolute)
 
   $("#input").height(height);
   $("#input .input-wrapper").height(height - diff);
@@ -1722,9 +1771,6 @@ $(document).ready(function() {
   });
 
   $("#rows_query_run").on("click", runRowsQuery);
-  $("#rows_query_sql").on("keydown", function(e) {
-    if (e.keyCode == 13) { e.preventDefault(); runRowsQuery(); }
-  });
 
   $("#table_content").on("click",     function() { showTableContent();     });
   $("#table_structure").on("click",   function() { showTableStructure();   });
