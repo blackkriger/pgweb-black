@@ -1335,10 +1335,7 @@ function bindTableHeaderMenu() {
       $("#results_row_menu .row-edit-item, #results_row_menu .edit-divider").toggle(editable);
 
       if (editable) {
-        var $tr = $(element).closest("tr");
-        $("#results_row_menu [data-action='select_row']").text($tr.hasClass("selected") ? "Deselect Row" : "Select Row");
-
-        // One delete entry: bulk when a selection exists, single row otherwise.
+        // One delete entry: bulk when rows are checkbox-selected, single row otherwise.
         var selected = selectedRowCount();
         $("#results_row_menu [data-action='delete_row']").text(selected > 0 ? "Delete Selected (" + selected + ")…" : "Delete Row…");
       }
@@ -1354,9 +1351,6 @@ function bindTableHeaderMenu() {
           break;
         case "copy_value":
           copyToClipboard($(context).text());
-          break;
-        case "select_row":
-          toggleRowSelection($(context).closest("tr"));
           break;
         case "set_null":
           setCellNull($(context).children("div"));
@@ -1687,50 +1681,19 @@ function deleteRow($tr) {
   });
 }
 
-// Row selection. The .selected class on the <tr> is pgweb's original row highlight and the single source of truth — bulk delete operates on it. The leading checkbox mirrors it: a ticked checkbox always means the row is .selected, and vice versa in checkbox mode.
-//
-// Two modes, keyed off whether ANY checkbox is currently ticked:
-//   * none ticked  -> a left-click is a vanilla single select: highlight only that row (replacing the previous), no checkbox involved.
-//   * >=1 ticked    -> "checkbox mode": a left-click ticks + highlights the row additively, keeping the existing selection. Entered by ticking a checkbox or via the context-menu "Select Row".
+// Row selection for bulk actions is its own stream 
 function selectedRowCount() {
-  return $("#results_body tr.selected").length;
-}
-
-function checkedRowCount() {
   return $("#results_body input.row-select-box:checked").length;
 }
 
-// Tick (or untick) a row's checkbox and keep its highlight in lockstep.
-function setRowSelected($tr, on) {
-  if (!$tr || !$tr.length) return;
-  $tr.toggleClass("selected", on);
-  $tr.find("input.row-select-box").prop("checked", on);
-}
-
-// In checkbox mode the highlight set IS the ticked set — drop any leftover boxless single-select highlight so the two can never diverge.
-function syncHighlightToCheckboxes() {
-  $("#results_body tr.selected").each(function() {
-    if (!$(this).find("input.row-select-box").prop("checked")) $(this).removeClass("selected");
-  });
-}
-
-// Context-menu "Select Row" / "Deselect Row" — ticks the checkbox (so it enters checkbox mode).
-function toggleRowSelection($tr) {
-  if ($("#results").data("mode") != "browse") return;
-  if (!$tr || !$tr.length) return;
-  setRowSelected($tr, !$tr.hasClass("selected"));
-  syncHighlightToCheckboxes();
-}
-
 function clearRowSelection() {
-  $("#results_body tr.selected").removeClass("selected");
   $("#results_body input.row-select-box:checked").prop("checked", false);
 }
 
 function deleteSelectedRows() {
   if ($("#results").data("mode") != "browse") return;
 
-  var $rows = $("#results_body tr.selected");
+  var $rows = $("#results_body input.row-select-box:checked").closest("tr");
   if (!$rows.length) return;
   if (!confirm("Delete " + $rows.length + " selected row(s)? This cannot be undone.")) return;
 
@@ -1850,36 +1813,6 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // All row selection runs through this single click handler so the checkbox and the .selected
-  // highlight stay in lockstep. Clicks inside an open cell editor are ignored.
-  //   * Click the checkbox -> the browser has ALREADY toggled it (we must NOT preventDefault,
-  //                           or the native toggle is reverted and the box stays stuck). Just
-  //                           mirror its new state into .selected; ticking one also promotes a
-  //                           prior boxless single-select into checkbox mode.
-  //   * Click the row body -> while any checkbox is ticked we're in multi-select mode: toggle
-  //                           this row (add an unselected one, remove a selected one), keeping
-  //                           the rest. With nothing ticked it's a vanilla single-select:
-  //                           highlight only this row, replacing the previous.
-  $("#results_body").on("click", "tr", function(e) {
-    if ($("#results").data("mode") != "browse") return;
-    if ($(e.target).closest("td > div.editing").length) return;
-    var $tr = $(this);
-
-    if ($(e.target).is("input.row-select-box")) {
-      var on = $(e.target).prop("checked");
-      $tr.toggleClass("selected", on);
-      if (on) syncHighlightToCheckboxes();
-      return;
-    }
-
-    if (checkedRowCount() > 0) {
-      setRowSelected($tr, !$tr.hasClass("selected"));
-    } else {
-      $("#results_body tr.selected").removeClass("selected");
-      $tr.addClass("selected");
-    }
-  });
-
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
   $(document).on("keydown", function(e) {
     if (e.keyCode != 27) return;
@@ -1941,8 +1874,9 @@ $(document).ready(function() {
     copyToClipboard($(this).parent().text());
   });
 
+  // original single-row click highlight (.selected). Independent of the checkbox selection stream above.
   $("#results").on("click", "tr", function(e) {
-    $("#results tr.selected").removeClass();
+    $("#results tr.selected").removeClass("selected");
     $(this).addClass("selected");
   });
 

@@ -539,6 +539,12 @@
   color: #fff !important;
 }
 
+/* Checkbox-selected rows (bulk-action stream) — highlighted like a selected row. */
+#results tbody tr:has(input.row-select-box:checked) > td {
+  background: #3874d7 !important;
+  color: #fff !important;
+}
+
 #results td {
   color: #3a3633;
   vertical-align: middle;
@@ -1051,6 +1057,7 @@ body.office98 #results tr:nth-child(even) > td { background: #eef0f2; }
 body.office98 #results tbody tr { border-bottom: 1px solid #d4d0c8; }
 body.office98 #results tbody tr:hover td { background: #d8e4f8; }
 body.office98 #results tr.selected td { background: var(--navy) !important; color: #fff !important; }
+body.office98 #results tbody tr:has(input.row-select-box:checked) > td { background: var(--navy) !important; color: #fff !important; }
 body.office98 #results td div span.null { color: var(--sh); }
 body.office98 #results td textarea.cell-editor { background: #fff; color: #000 !important; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); }
 
