@@ -151,3 +151,39 @@ func (client *Client) DeleteTableRows(table string, rows []map[string]*string) (
 	sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s`, schema, name, strings.Join(conds, " OR "))
 	return client.query(sql, args...)
 }
+
+// SelectTableRows returns the full rows identified by the given primary keys (same PK-matching as DeleteTableRows, but a SELECT *), so a selection of rows can be exported through the normal result formatters. Requires a primary key.
+func (client *Client) SelectTableRows(table string, rows []map[string]*string) (*Result, error) {
+	schema, name := getSchemaAndTable(table)
+
+	if len(rows) == 0 {
+		return nil, fmt.Errorf("no rows to export")
+	}
+
+	meta, err := client.TableColumnsMeta(table)
+	if err != nil {
+		return nil, err
+	}
+
+	types, primaryKey := parseColumnsMeta(meta)
+	if len(types) == 0 {
+		return nil, fmt.Errorf("table %q does not exist", table)
+	}
+	if len(primaryKey) == 0 {
+		return nil, fmt.Errorf("cannot export rows: table %q has no primary key", table)
+	}
+
+	conds := make([]string, 0, len(rows))
+	args := []interface{}{}
+	for _, rowValues := range rows {
+		where, whereArgs, err := buildPrimaryKeyMatch(types, primaryKey, rowValues, len(args)+1)
+		if err != nil {
+			return nil, err
+		}
+		conds = append(conds, "("+where+")")
+		args = append(args, whereArgs...)
+	}
+
+	sql := fmt.Sprintf(`SELECT * FROM "%s"."%s" WHERE %s`, schema, name, strings.Join(conds, " OR "))
+	return client.query(sql, args...)
+}

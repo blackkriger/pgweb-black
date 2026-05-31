@@ -47,6 +47,7 @@ func SetupRoutes(router *gin.Engine) {
 	api.POST("/tables/:table/update", UpdateTableRow)
 	api.POST("/tables/:table/delete", DeleteTableRow)
 	api.POST("/tables/:table/bulk_delete", DeleteTableRows)
+	api.POST("/tables/:table/export_rows", ExportTableRows)
 	api.GET("/tables_stats", GetTablesStats)
 	api.GET("/functions/:id", GetFunction)
 	api.GET("/query", RunQuery)

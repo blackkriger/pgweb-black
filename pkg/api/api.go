@@ -589,6 +589,51 @@ func DeleteTableRows(c *gin.Context) {
 	serveResult(c, res, err)
 }
 
+// ExportTableRows streams the selected rows (located by primary key) in the requested format — same export formats as a query export, but scoped to a row selection.
+func ExportTableRows(c *gin.Context) {
+	raw := c.Request.FormValue("rows")
+	if raw == "" {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	var rows []map[string]*string
+	if err := json.Unmarshal([]byte(raw), &rows); err != nil {
+		badRequest(c, fmt.Errorf("invalid rows payload: %v", err))
+		return
+	}
+	if len(rows) == 0 {
+		badRequest(c, errRowRequired)
+		return
+	}
+
+	res, err := DB(c).SelectTableRows(c.Params.ByName("table"), rows)
+	if err != nil {
+		badRequest(c, err)
+		return
+	}
+
+	format := getQueryParam(c, "format")
+	filename := getQueryParam(c, "filename")
+	if filename == "" {
+		filename = fmt.Sprintf("pgweb-selected-%v.%v", time.Now().Unix(), format)
+	}
+	if format != "" {
+		c.Writer.Header().Set("Content-disposition", "attachment;filename="+filename)
+	}
+
+	switch format {
+	case "csv":
+		c.Data(200, "text/csv", res.CSV())
+	case "json":
+		c.Data(200, "application/json", res.JSON())
+	case "xml":
+		c.XML(200, res)
+	default:
+		c.JSON(200, res)
+	}
+}
+
 // GetTablesStats renders data sizes and estimated rows for all tables in the database
 func GetTablesStats(c *gin.Context) {
 	db := DB(c)

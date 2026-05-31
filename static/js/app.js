@@ -1334,9 +1334,11 @@ function bindTableHeaderMenu() {
       var editable = browseMode == "browse";
       $("#results_row_menu .row-edit-item, #results_row_menu .edit-divider").toggle(editable);
 
+      var selected = editable ? selectedRowCount() : 0;
+      // Export-selected entries only make sense with a checkbox selection.
+      $("#results_row_menu .row-export-item").toggle(editable && selected > 0);
       if (editable) {
         // One delete entry: bulk when rows are checkbox-selected, single row otherwise.
-        var selected = selectedRowCount();
         $("#results_row_menu [data-action='delete_row']").text(selected > 0 ? "Delete Selected (" + selected + ")…" : "Delete Row…");
       }
     },
@@ -1729,6 +1731,26 @@ function deleteSelectedRows() {
   });
 }
 
+// Export the checkbox-selected rows through the server's normal export formatter.
+// Rows are POSTed (the selection can be large) by their values; the backend re-selects them by primary key and streams the chosen format as a download.
+function exportSelectedRows(format) {
+  if ($("#results").data("mode") != "browse") return;
+
+  var $rows = $("#results_body input.row-select-box:checked").closest("tr");
+  if (!$rows.length) return;
+
+  var payload = [];
+  $rows.each(function() { payload.push(collectRowValues($(this))); });
+
+  var $form = $("<form>", {
+    method: "POST",
+    action: "api/tables/" + $("#results").data("table") + "/export_rows?format=" + format,
+    target: "_blank"
+  });
+  $("<input>", { type: "hidden", name: "rows", value: JSON.stringify(payload) }).appendTo($form);
+  $form.appendTo("body").submit().remove();
+}
+
 function startCellEdit($div) {
   if ($("#results").data("mode") != "browse") {
     displayCellValue($div);
@@ -1825,13 +1847,23 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // Header "select all" — ticks/unticks every row checkbox on the page and
-  // mirrors that onto the .row-checked highlight class.
-  $("#results_header").on("change", "input.row-select-all", function() {
-    this.indeterminate = false;
-    var on = this.checked;
+  // Export-selected submenu. 
+  $("#results_row_menu").on("click", ".export-parent", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  $("#results_row_menu").on("click", "a.export-fmt", function(e) {
+    e.preventDefault();
+    exportSelectedRows($(this).data("format"));
+  });
+
+  // Header "select all": if anything is selected (partial OR full) a click CLEARS everything 
+  $("#results_header").on("click", "input.row-select-all", function(e) {
+    e.preventDefault();
+    var on = $("#results_body input.row-select-box:checked").length === 0;
     $("#results_body input.row-select-box").prop("checked", on);
     $("#results_body input.row-select-box").closest("tr").toggleClass("row-checked", on);
+    syncSelectAll();
   });
   // Per-row tick: keep the row highlight + the header box in sync.
   $("#results_body").on("change", "input.row-select-box", function() {
