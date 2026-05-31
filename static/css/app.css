@@ -600,7 +600,7 @@
   padding: 0 6px;
   text-align: center;
 }
-#results td.row-select-col input.row-select-box {
+#results .row-select-col input {
   margin: 0;
   cursor: pointer;
   vertical-align: middle;
@@ -1124,6 +1124,26 @@ body.office98 #close_connection {
 body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
 
+/* Win98 focus cue — the classic dotted rectangle drawn inset inside the button face, on every themed button. */
+body.office98 .btn:focus,
+body.office98 #pagination .btn-default:focus,
+body.office98 #pagination .filters .btn-primary:focus,
+body.office98 .connection-group-switch .btn:focus,
+body.office98 .open-connection:focus,
+body.office98 #toggle_theme:focus,
+body.office98 #edit_connection:focus,
+body.office98 #close_connection:focus {
+  outline: 1px dotted #000;
+  outline-offset: -4px;
+}
+/* Toolbar groove — a 2-tone vertical rule (shadow + highlight) splitting the export group off from the query/explain controls, like a Win98 toolbar. */
+body.office98 #input .actions .pull-right {
+  margin-left: 8px;
+  padding-left: 10px;
+  border-left: 1px solid var(--sh);
+  box-shadow: inset 1px 0 0 0 var(--hi);
+}
+
 /* Themed skins only: lay the query input area out with absolute positioning so the editor fills the wrapper and the actions bar is pinned to the bottom — together they tile #input with no theme-background gaps, regardless of the pixel heights resizeInput sets (inline heights are overridden). Classic keeps the original flow layout untouched. The #input is position:relative already. */
 body.office98 #input .input-wrapper {
   position: absolute;
@@ -1149,7 +1169,10 @@ body.office98 #input .input-wrapper #custom_query {
   position: absolute;
   top: 0; left: 0; right: 0;
   min-height: 40px;
-  padding: 6px 10px;
+  /* No bottom padding: the editor sits flush with the bar's bottom edge so
+     there's no strip of bar-background showing between it and the pagination
+     below (was a visible grey seam in the Office 98 theme). */
+  padding: 6px 10px 0;
   box-sizing: border-box;
   background: #fff;
   border-bottom: 1px solid #eee;

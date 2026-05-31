@@ -444,7 +444,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
   var rows = "";
 
   // Leading checkbox column for row multi-selection (browse views only).
-  if (options.selectable) cols += "<th class='row-select-col'></th>";
+  if (options.selectable) cols += "<th class='row-select-col'><input type='checkbox' class='row-select-all' title='Select all rows on this page' /></th>";
 
   results.columns.forEach(function(col) {
     if (col === sortColumn) {
@@ -1688,6 +1688,17 @@ function selectedRowCount() {
 
 function clearRowSelection() {
   $("#results_body input.row-select-box:checked").prop("checked", false);
+  syncSelectAll();
+}
+
+// Keep the header "select all" box reflecting the page: checked when every row is ticked, indeterminate while only some are, unchecked when none. Highlight follows automatically via the tr:has(:checked) CSS rule.
+function syncSelectAll() {
+  var $all = $("#results_header input.row-select-all");
+  if (!$all.length) return;
+  var total   = $("#results_body input.row-select-box").length;
+  var checked = $("#results_body input.row-select-box:checked").length;
+  $all.prop("checked", total > 0 && checked === total);
+  $all.prop("indeterminate", checked > 0 && checked < total);
 }
 
 function deleteSelectedRows() {
@@ -1811,6 +1822,16 @@ function bindContentModalEvents() {
 
   $("#results").on("dblclick", "td > div", function() {
     startCellEdit($(this));
+  });
+
+  // Header "select all" — ticks/unticks every row checkbox on the page.
+  $("#results_header").on("change", "input.row-select-all", function() {
+    this.indeterminate = false;
+    $("#results_body input.row-select-box").prop("checked", this.checked);
+  });
+  // Reflect partial/full selection back onto the header box as rows are ticked.
+  $("#results_body").on("change", "input.row-select-box", function() {
+    syncSelectAll();
   });
 
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
