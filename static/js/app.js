@@ -1853,28 +1853,33 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // Left-click on a row. With no checkbox ticked it's a vanilla single select (highlight only
-  // this row, replacing the previous, no checkbox). Once any checkbox is ticked we're in
-  // checkbox mode: the click ticks + highlights this row additively. Clicks on the checkbox
-  // itself are handled by its change event below; clicks inside an open cell editor are ignored.
+  // All row selection runs through this single click handler, so the checkbox and the
+  // .selected highlight can never drift apart (we manage the checkbox ourselves rather than
+  // trusting the native toggle + a separate change event).
+  //   * Click the checkbox  -> preventDefault the native toggle, then flip this row (tick +
+  //                            highlight, or untick + unhighlight) ourselves.
+  //   * Click the row body  -> vanilla single-select (highlight only this row, no checkbox)
+  //                            while nothing is ticked; additive tick + highlight once any
+  //                            checkbox is ticked.
+  // Clicks inside an open cell editor are ignored.
   $("#results_body").on("click", "tr", function(e) {
     if ($("#results").data("mode") != "browse") return;
-    if ($(e.target).is("input.row-select-box")) return;
     if ($(e.target).closest("td > div.editing").length) return;
+    var $tr = $(this);
+
+    if ($(e.target).is("input.row-select-box")) {
+      e.preventDefault();
+      setRowSelected($tr, !$tr.hasClass("selected"));
+      syncHighlightToCheckboxes();
+      return;
+    }
 
     if (checkedRowCount() > 0) {
-      setRowSelected($(this), true);
+      setRowSelected($tr, true);
     } else {
       $("#results_body tr.selected").removeClass("selected");
-      $(this).addClass("selected");
+      $tr.addClass("selected");
     }
-  });
-
-  // The checkbox drives the highlight (ticked => selected, unticked => not), and ticking one
-  // promotes a prior boxless single-select into checkbox mode (so highlight == ticked set).
-  $("#results_body").on("change", "input.row-select-box", function() {
-    $(this).closest("tr").toggleClass("selected", this.checked);
-    if (this.checked) syncHighlightToCheckboxes();
   });
 
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
