@@ -539,8 +539,10 @@
   color: #fff !important;
 }
 
-/* Checkbox-selected rows (bulk-action stream) — highlighted like a selected row. */
-#results tbody tr:has(input.row-select-box:checked) > td {
+/* Checkbox-selected rows (bulk-action stream) — highlighted like a selected row.
+   .row-checked is toggled from JS in lockstep with the checkbox so it never
+   depends on :has() re-evaluation. */
+#results tbody tr.row-checked > td {
   background: #3874d7 !important;
   color: #fff !important;
 }
@@ -1057,7 +1059,7 @@ body.office98 #results tr:nth-child(even) > td { background: #eef0f2; }
 body.office98 #results tbody tr { border-bottom: 1px solid #d4d0c8; }
 body.office98 #results tbody tr:hover td { background: #d8e4f8; }
 body.office98 #results tr.selected td { background: var(--navy) !important; color: #fff !important; }
-body.office98 #results tbody tr:has(input.row-select-box:checked) > td { background: var(--navy) !important; color: #fff !important; }
+body.office98 #results tbody tr.row-checked > td { background: var(--navy) !important; color: #fff !important; }
 body.office98 #results td div span.null { color: var(--sh); }
 body.office98 #results td textarea.cell-editor { background: #fff; color: #000 !important; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); }
 
@@ -1136,13 +1138,6 @@ body.office98 #close_connection:focus {
   outline: 1px dotted #000;
   outline-offset: -4px;
 }
-/* Toolbar groove — a 2-tone vertical rule (shadow + highlight) splitting the export group off from the query/explain controls, like a Win98 toolbar. */
-body.office98 #input .actions .pull-right {
-  margin-left: 8px;
-  padding-left: 10px;
-  border-left: 1px solid var(--sh);
-  box-shadow: inset 1px 0 0 0 var(--hi);
-}
 
 /* Themed skins only: lay the query input area out with absolute positioning so the editor fills the wrapper and the actions bar is pinned to the bottom — together they tile #input with no theme-background gaps, regardless of the pixel heights resizeInput sets (inline heights are overridden). Classic keeps the original flow layout untouched. The #input is position:relative already. */
 body.office98 #input .input-wrapper {
@@ -1201,8 +1196,11 @@ body.office98 #input .input-wrapper #custom_query {
   background: #fff;
 }
 #rows_query .btn:hover { border-color: #64903e; color: #64903e; background: #fff; }
-.with-rows-query.with-pagination #pagination { top: var(--rq-h, 40px); }
-.with-rows-query.with-pagination #output { top: calc(var(--rq-h, 40px) + 50px) !important; }
+/* Pull the pagination up 1px so it overlaps the query bar's bottom edge — kills
+   the hairline seam (border + a sub-pixel sliver of the teal desktop showing
+   through from rounding) that looked like a gap between the two bars. */
+.with-rows-query.with-pagination #pagination { top: calc(var(--rq-h, 40px) - 1px); }
+.with-rows-query.with-pagination #output { top: calc(var(--rq-h, 40px) + 49px) !important; }
 .with-rows-query:not(.with-pagination) #output { top: var(--rq-h, 40px) !important; }
 
 /* Office 98 bar */

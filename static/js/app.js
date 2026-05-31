@@ -1688,6 +1688,7 @@ function selectedRowCount() {
 
 function clearRowSelection() {
   $("#results_body input.row-select-box:checked").prop("checked", false);
+  $("#results_body tr.row-checked").removeClass("row-checked");
   syncSelectAll();
 }
 
@@ -1824,13 +1825,17 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // Header "select all" — ticks/unticks every row checkbox on the page.
+  // Header "select all" — ticks/unticks every row checkbox on the page and
+  // mirrors that onto the .row-checked highlight class.
   $("#results_header").on("change", "input.row-select-all", function() {
     this.indeterminate = false;
-    $("#results_body input.row-select-box").prop("checked", this.checked);
+    var on = this.checked;
+    $("#results_body input.row-select-box").prop("checked", on);
+    $("#results_body input.row-select-box").closest("tr").toggleClass("row-checked", on);
   });
-  // Reflect partial/full selection back onto the header box as rows are ticked.
+  // Per-row tick: keep the row highlight + the header box in sync.
   $("#results_body").on("change", "input.row-select-box", function() {
+    $(this).closest("tr").toggleClass("row-checked", this.checked);
     syncSelectAll();
   });
 
@@ -1895,8 +1900,11 @@ $(document).ready(function() {
     copyToClipboard($(this).parent().text());
   });
 
-  // original single-row click highlight (.selected). Independent of the checkbox selection stream above.
+  // original single-row click highlight (.selected). Independent of the checkbox selection
+  // stream — and it must NOT fire for clicks in the checkbox column (the select-all box, a
+  // row box, or the cell around them), or it would thrash selection on every tick.
   $("#results").on("click", "tr", function(e) {
+    if ($(e.target).closest(".row-select-col").length) return;
     $("#results tr.selected").removeClass("selected");
     $(this).addClass("selected");
   });
