@@ -934,142 +934,6 @@
 }
 
 /* ============================================================================
-   My_games PS1 BIOS theme. Opt-in via the `bios` class on <body> (toggled by #toggle_theme, persisted in localStorage). 
-   ============================================================================ */
-body.bios {
-  --bg:     #050530;
-  --panel:  rgba(7, 7, 36, 0.82);
-  --panel2: rgba(20, 20, 84, 0.82);
-  --ink:    #f4f1e4;
-  --dim:    #b9b6a4;
-  --gold:   #e8c267;
-  --gold2:  #fde29b;
-  --line:   rgba(217, 185, 92, 0.28);
-  color: var(--ink);
-  font-family: 'JetBrains Mono', 'Consolas', 'Courier New', monospace;
-  background:
-    radial-gradient(ellipse at 50% 30%, rgba(30, 30, 180, 0.55) 0%, rgba(10, 10, 64, 0.95) 60%, transparent 100%),
-    repeating-linear-gradient(0deg, transparent 0, transparent 39px, rgba(43, 43, 216, 0.22) 39px, rgba(43, 43, 216, 0.22) 40px),
-    repeating-linear-gradient(90deg, transparent 0, transparent 39px, rgba(43, 43, 216, 0.22) 39px, rgba(43, 43, 216, 0.22) 40px),
-    linear-gradient(180deg, #0a0a40 0%, #050530 100%);
-  background-attachment: fixed;
-}
-
-/* Transparent so the grid backdrop shows through the editor + results area. */
-body.bios #main,
-body.bios #body,
-body.bios #output { background: transparent; }
-
-/* top nav */
-body.bios #nav { background: var(--panel); border-bottom: 2px solid var(--gold); }
-body.bios #nav ul li { color: var(--gold); letter-spacing: .05em; }
-body.bios #nav ul li:hover { color: var(--gold2); }
-body.bios #nav ul li.selected,
-body.bios #nav ul li.selected:before { background: var(--gold); color: var(--bg); }
-
-/* sidebar */
-body.bios #sidebar { background: var(--panel); border-right: 1px solid var(--line); }
-body.bios #sidebar .current-database { background: var(--panel2); color: var(--gold); border-bottom: 1px solid var(--gold); }
-body.bios #sidebar .current-database input.typeahead { background: var(--panel2); color: var(--ink); }
-body.bios #sidebar .objects-search .wrap { border-bottom: 1px solid var(--line); }
-body.bios #sidebar .objects-search input[type="text"] { color: var(--ink); }
-body.bios #sidebar .objects-search i.fa-search,
-body.bios #sidebar .objects-search i.fa-times-circle { color: var(--dim); }
-body.bios #sidebar div.table-information .title { color: var(--gold); border-top: 1px solid var(--line); }
-body.bios #sidebar div.table-information .lines .line,
-body.bios #sidebar div.table-information .lines .line span { color: var(--dim) !important; }
-
-/* object tree */
-body.bios .schema .schema-name,
-body.bios .schema .schema-container .schema-group .schema-group-title { color: var(--ink); }
-body.bios .schema .schema-container .schema-group ul li { color: var(--dim); }
-body.bios .schema .schema-container .schema-group ul li:hover { background: var(--panel2); color: var(--gold); }
-body.bios .schema .schema-container .schema-group ul li.active { background: var(--gold); color: var(--bg); }
-body.bios .schema .schema-container .schema-group ul li.active i { color: var(--bg); }
-body.bios .schema i,
-body.bios .schema .schema-group-count { color: var(--dim); }
-
-/* query actions bar + buttons */
-body.bios #input .actions { background: var(--panel); border-top: 1px solid var(--line); }
-body.bios #input .actions #result-rows-count,
-body.bios #input .actions #query_progress { color: var(--dim); }
-body.bios #input .actions .btn { color: var(--ink); border-color: var(--gold); background: linear-gradient(180deg, rgba(232, 194, 103, 0.18) 0%, rgba(232, 194, 103, 0.04) 100%); }
-body.bios #input .actions .btn:hover { color: var(--ink) !important; background: linear-gradient(180deg, rgba(253, 226, 155, 0.28) 0%, rgba(232, 194, 103, 0.1) 100%) !important; border-color: var(--gold2); }
-/* PSone press feedback — every themed button nudges down on click. */
-body.bios .btn { transition: transform 80ms ease, background 120ms ease, border-color 120ms ease; }
-body.bios .btn:active { transform: translateY(1px); }
-body.bios #input_resize_handler { background: var(--line); }
-
-/* pagination + filters */
-body.bios #pagination { background: var(--panel); border-bottom: 1px solid var(--gold); box-shadow: none; }
-body.bios #pagination .filters span,
-body.bios #pagination .current-page { color: var(--dim); }
-body.bios #pagination .filters input,
-body.bios #pagination .filters select { background: var(--panel2); color: var(--ink); border: 1px solid var(--line); }
-body.bios #pagination .btn-default { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
-body.bios #pagination .filters .btn-primary { background: transparent; color: var(--gold); border-color: var(--gold); }
-
-/* results table */
-body.bios #results th { background: var(--panel2); color: var(--gold); border-bottom: 1px solid var(--gold); }
-body.bios #results th:hover,
-body.bios #results[data-mode="browse"] th:hover,
-body.bios #results th.active { background: var(--line); }
-body.bios #results td { color: var(--ink); }
-body.bios #results tr:nth-child(odd) > td { background: var(--bg); }
-body.bios #results tr:nth-child(even) > td { background: var(--panel); }
-body.bios #results tbody tr { border-bottom: 1px solid var(--line); }
-body.bios #results tbody tr:hover td { background: var(--panel2); }
-body.bios #results tr.selected td { background: var(--gold) !important; color: var(--bg) !important; }
-body.bios #results td div span.null { color: var(--dim); }
-body.bios #results td textarea.cell-editor { background: var(--bg); color: var(--ink) !important; border-color: var(--gold); }
-
-/* cell value modal */
-body.bios #content_modal { background: #0a0a40; border: 2px solid var(--gold); box-shadow: 0 0 24px rgba(232, 194, 103, 0.35); }
-body.bios #content_modal .title { background: #141466; color: var(--gold); }
-body.bios #content_modal .content { background: #07071f; color: var(--ink); }
-body.bios #content_modal .actions .fa { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
-
-/* context menus */
-body.bios .dropdown-menu { background: #0a0a40; border: 1px solid var(--gold); box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5); }
-body.bios .dropdown-menu > li > a { color: var(--ink); }
-body.bios .dropdown-menu > li > a:hover,
-body.bios .dropdown-menu > li > a:focus { background: var(--gold); color: var(--bg); }
-body.bios .dropdown-menu .divider { background: var(--line); }
-
-/* error banner */
-body.bios #error_banner { background: #b3122e; color: #fff; }
-
-/* connection screen */
-body.bios #connection_window {
-  color: var(--ink);
-  background:
-    radial-gradient(ellipse at 50% 30%, rgba(30, 30, 180, 0.55) 0%, rgba(10, 10, 64, 0.95) 60%, transparent 100%),
-    repeating-linear-gradient(0deg, transparent 0, transparent 39px, rgba(43, 43, 216, 0.22) 39px, rgba(43, 43, 216, 0.22) 40px),
-    repeating-linear-gradient(90deg, transparent 0, transparent 39px, rgba(43, 43, 216, 0.22) 39px, rgba(43, 43, 216, 0.22) 40px),
-    linear-gradient(180deg, #0a0a40 0%, #050530 100%);
-}
-body.bios .connection-settings .header h1 { color: var(--gold); font-family: 'Cinzel', 'Times New Roman', serif; text-shadow: 0 0 14px rgba(232, 194, 103, 0.45); }
-body.bios .connection-settings .header .version,
-body.bios .connection-settings .connection-ssh-group h3 { color: var(--dim); }
-body.bios .connection-settings form { background: #0a0a40; border: 1px solid var(--gold); }
-body.bios .connection-settings label,
-body.bios .connection-settings .control-label { color: var(--ink); }
-body.bios .connection-settings .form-control { background: rgba(0, 0, 0, 0.5); color: var(--ink); border: 1px solid var(--line); box-shadow: none; }
-body.bios .connection-settings .help-block { color: var(--dim); }
-body.bios .connection-group-switch .btn { background: transparent; color: var(--gold); border-color: var(--gold); }
-body.bios .connection-group-switch .btn.active { background: var(--gold); color: var(--bg); }
-body.bios .open-connection { background: var(--gold); color: var(--bg); border-color: var(--gold); }
-
-/* top-right action buttons + theme toggle */
-body.bios #toggle_theme,
-body.bios #edit_connection,
-body.bios #close_connection { background: var(--panel2); color: var(--gold); border-color: var(--gold); }
-
-/* ace gutter (editor body kept light so the light syntax theme stays readable) */
-body.bios .ace_gutter,
-body.bios .ace_gutter-cell { background: var(--panel) !important; color: var(--dim); }
-
-/* ============================================================================
    Office 98 theme. Opt-in via the `office98` class on <body>. Classic Win98 chrome: gray faces, raised/sunken bevels, navy title bars, teal desktop, MS Sans Serif. Mirrors the My_games Win98 dialog recipe. Scoped under body.office98 so the default look is untouched.
    ============================================================================ */
 body.office98 {
@@ -1094,8 +958,9 @@ body.office98 #output { background: var(--desktop); }
 body.office98 #nav { background: var(--face); border-bottom: 1px solid var(--dk); box-shadow: inset 0 1px 0 0 var(--hi), inset 0 -1px 0 0 var(--sh); }
 body.office98 #nav ul li { color: #000; }
 body.office98 #nav ul li:hover { color: #000; background: #d4d0c8; }
-body.office98 #nav ul li.selected,
-body.office98 #nav ul li.selected:before { background: linear-gradient(90deg, var(--navy) 0%, var(--navy2) 100%); color: #fff; }
+body.office98 #nav ul li.selected { background: linear-gradient(90deg, var(--navy) 0%, var(--navy2) 100%); color: #fff; }
+/* Kill the classic 1px "tab bleeds into the panel below" strip — the office tab is a flat navy selection over a gray toolbar, not a folder tab, so the overhang just left a misaligned navy nub. */
+body.office98 #nav ul li.selected:before { display: none; }
 
 /* sidebar — gray panel, navy title bar for current database */
 body.office98 #sidebar { background: var(--face); border-right: 1px solid var(--dk); box-shadow: inset -1px 0 0 0 var(--sh); }
@@ -1239,19 +1104,16 @@ body.office98 .ace_gutter,
 body.office98 .ace_gutter-cell { background: var(--face) !important; color: var(--sh); }
 
 /* Themed skins only: lay the query input area out with absolute positioning so the editor fills the wrapper and the actions bar is pinned to the bottom — together they tile #input with no theme-background gaps, regardless of the pixel heights resizeInput sets (inline heights are overridden). Classic keeps the original flow layout untouched. The #input is position:relative already. */
-body.bios #input .input-wrapper,
 body.office98 #input .input-wrapper {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 50px; /* 50px = actions bar height */
   height: auto !important;
   padding-top: 0;
 }
-body.bios #input .actions,
 body.office98 #input .actions {
   position: absolute;
   left: 0; right: 0; bottom: 0;
 }
-body.bios #input .input-wrapper #custom_query,
 body.office98 #input .input-wrapper #custom_query {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
@@ -1278,7 +1140,7 @@ body.office98 #input .input-wrapper #custom_query {
 #rows_query_editor {
   flex: 1 1 auto;
   min-width: 0;
-  height: 24px;
+  height: 80px;
   min-height: 24px;
   font-size: 13px;
   border: 1px solid #ccc;
@@ -1298,12 +1160,6 @@ body.office98 #input .input-wrapper #custom_query {
 .with-rows-query.with-pagination #pagination { top: var(--rq-h, 40px); }
 .with-rows-query.with-pagination #output { top: calc(var(--rq-h, 40px) + 50px) !important; }
 .with-rows-query:not(.with-pagination) #output { top: var(--rq-h, 40px) !important; }
-
-/* BIOS bar */
-body.bios #rows_query { background: rgba(7, 7, 36, 0.82); border-bottom: 1px solid var(--gold); }
-body.bios #rows_query_editor { border: 1px solid var(--gold); }
-body.bios #rows_query .btn { color: var(--ink); border: 1px solid var(--gold); background: linear-gradient(180deg, rgba(232, 194, 103, 0.18) 0%, rgba(232, 194, 103, 0.04) 100%); }
-body.bios #rows_query .btn:hover { background: linear-gradient(180deg, rgba(253, 226, 155, 0.28) 0%, rgba(232, 194, 103, 0.1) 100%); border-color: var(--gold2); }
 
 /* Office 98 bar */
 body.office98 #rows_query { background: var(--face); border-bottom: 1px solid var(--dk); box-shadow: inset 0 1px 0 0 var(--hi); }

@@ -46,6 +46,7 @@ func SetupRoutes(router *gin.Engine) {
 	api.GET("/tables/:table/constraints", GetTableConstraints)
 	api.POST("/tables/:table/update", UpdateTableRow)
 	api.POST("/tables/:table/delete", DeleteTableRow)
+	api.POST("/tables/:table/bulk_delete", DeleteTableRows)
 	api.GET("/tables_stats", GetTablesStats)
 	api.GET("/functions/:id", GetFunction)
 	api.GET("/query", RunQuery)

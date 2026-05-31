@@ -665,14 +665,15 @@ function buildBrowseQuery(table, opts) {
   return sql;
 }
 
-// Run the (possibly edited) query bar SQL in place: render its rows, keeping the bar and pagination/filters visible. Mark the result as a query so the browse-only cell edit/delete stay disabled for arbitrary output.
+// Run the (possibly edited) query bar SQL in place: render its rows, keeping the bar and pagination/filters visible. The rows bar always runs against the current table, so keep the result editable (cell edit / Set NULL / row + bulk delete) just like plain browse — rows missing a primary key column simply fail server-side with an error banner.
 function runRowsQuery() {
   var sql = rowsEditor ? $.trim(rowsEditor.getValue()) : "";
   if (!sql) return;
 
+  var table = $("#results").data("table");
   executeQuery(sql, function(data) {
     buildTable(data);
-    $("#results").data("mode", "query");
+    $("#results").data("mode", "browse").data("table", table);
   });
 }
 
@@ -1322,6 +1323,23 @@ function bindTableHeaderMenu() {
         this.closemenu();
         return false;
       }
+
+      // Editing actions (select / Set NULL / row + bulk delete) only make sense while browsing a single table's rows, where each row carries its primary key.
+      var editable = browseMode == "browse";
+      $("#results_row_menu .row-edit-item, #results_row_menu .edit-divider").toggle(editable);
+
+      if (editable) {
+        var $tr = $(element).closest("tr");
+        $("#results_row_menu [data-action='select_row']").text($tr.hasClass("selected") ? "Deselect Row" : "Select Row");
+
+        var selected = selectedRowCount();
+        var $del = $("#results_row_menu .row-delete-selected");
+        if (selected > 0) {
+          $del.show().find("a").text("Delete Selected (" + selected + ")…");
+        } else {
+          $del.hide();
+        }
+      }
     },
     onItem: function(context, e) {
       var menuItem = $(e.target);
@@ -1334,6 +1352,12 @@ function bindTableHeaderMenu() {
           break;
         case "copy_value":
           copyToClipboard($(context).text());
+          break;
+        case "select_row":
+          toggleRowSelection($(context).closest("tr"));
+          break;
+        case "delete_selected":
+          deleteSelectedRows();
           break;
         case "set_null":
           setCellNull($(context).children("div"));
@@ -1661,6 +1685,48 @@ function deleteRow($tr) {
   });
 }
 
+// Row multi-selection. The .selected class is the single source of truth (styled in app.css).
+// A selection is started from the "Select Row" context-menu item; once at least one row is selected, plain left-clicks on rows toggle their selection so several can be picked at once.
+function selectedRowCount() {
+  return $("#results_body tr.selected").length;
+}
+
+function toggleRowSelection($tr) {
+  if ($("#results").data("mode") != "browse") return;
+  if ($tr && $tr.length) $tr.toggleClass("selected");
+}
+
+function clearRowSelection() {
+  $("#results_body tr.selected").removeClass("selected");
+}
+
+function deleteSelectedRows() {
+  if ($("#results").data("mode") != "browse") return;
+
+  var $rows = $("#results_body tr.selected");
+  if (!$rows.length) return;
+  if (!confirm("Delete " + $rows.length + " selected row(s)? This cannot be undone.")) return;
+
+  var payload = [];
+  $rows.each(function() { payload.push(collectRowValues($(this))); });
+
+  apiCall("post", "/tables/" + $("#results").data("table") + "/bulk_delete", { rows: JSON.stringify(payload) }, function(resp) {
+    if (resp && resp.error) {
+      showErrorBanner("Delete failed: " + resp.error);
+      return;
+    }
+    var affected = (resp && resp.rows && resp.rows[0]) ? resp.rows[0][0] : 0;
+    if (!affected) {
+      showErrorBanner("No rows deleted — they may have changed. Refresh and try again.");
+      return;
+    }
+    if (affected < $rows.length) {
+      showErrorBanner("Deleted " + affected + " of " + $rows.length + " rows — some may have changed. Refresh to verify.");
+    }
+    $rows.remove();
+  });
+}
+
 function startCellEdit($div) {
   if ($("#results").data("mode") != "browse") {
     displayCellValue($div);
@@ -1716,9 +1782,9 @@ function startCellEdit($div) {
   $editor.on("blur", commit);
 }
 
-// Theme cycling. Each theme id doubles as the <body> class ("classic" = none). The button shows the active theme; clicking advances to the next one. The choice is persisted in localStorage.
-var THEMES = ["classic", "bios", "office98"];
-var THEME_LABELS = { classic: "Classic", bios: "PS1 BIOS", office98: "Office 98" };
+// Theme cycling. Each theme id doubles as the <body> class ("classic" = none). The button shows the active theme; clicking advances to the next one. The choice is persisted in localStorage. A previously stored theme that's no longer offered (e.g. the removed "bios") falls back to classic.
+var THEMES = ["classic", "office98"];
+var THEME_LABELS = { classic: "Classic", office98: "Office 98" };
 
 function currentTheme() {
   var t = localStorage.getItem("pgweb_theme") || "classic";
@@ -1727,7 +1793,7 @@ function currentTheme() {
 
 function applyTheme() {
   var t = currentTheme();
-  $("body").removeClass("bios office98");
+  $("body").removeClass("office98");
   if (t !== "classic") $("body").addClass(t);
   $("#toggle_theme").text(THEME_LABELS[t]);
 }
@@ -1755,6 +1821,23 @@ function bindContentModalEvents() {
 
   $("#results").on("dblclick", "td > div", function() {
     startCellEdit($(this));
+  });
+
+  // Once a selection exists (started from the row context menu), plain left-clicks on rows toggle their selection so several rows can be picked for a bulk delete.
+  $("#results_body").on("click", "tr", function(e) {
+    if ($("#results").data("mode") != "browse") return;
+    if (selectedRowCount() === 0) return;
+    if ($(e.target).closest("td > div.editing").length) return;
+    toggleRowSelection($(this));
+  });
+
+  // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
+  $(document).on("keydown", function(e) {
+    if (e.keyCode != 27) return;
+    if ($("#results").data("mode") != "browse") return;
+    if (selectedRowCount() === 0) return;
+    if ($(e.target).is("input, textarea")) return;
+    clearRowSelection();
   });
 }
 

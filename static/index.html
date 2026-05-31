@@ -8,9 +8,6 @@
   <link rel="stylesheet" href="static/css/bootstrap.css"></link>
   <link rel="stylesheet" href="static/css/font-awesome.css"></link>
   <link rel="stylesheet" href="static/css/app.css"></link>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
   <link rel="icon" type="image/x-icon" href="static/img/icon.ico" />
   <script type="text/javascript" src="static/js/jquery.js"></script>
   <script type="text/javascript" src="static/js/ace.js"></script>
@@ -353,9 +350,11 @@
       <li><a href="#" data-action="display_value">Display Value</a></li>
       <li><a href="#" data-action="copy_value">Copy Value</a></li>
       <li><a href="#" data-action="filter_by_value">Filter Rows By Value</a></li>
-      <li class="divider"></li>
-      <li><a href="#" data-action="set_null">Set NULL</a></li>
-      <li><a href="#" data-action="delete_row">Delete Row…</a></li>
+      <li class="divider edit-divider"></li>
+      <li class="row-edit-item"><a href="#" data-action="select_row">Select Row</a></li>
+      <li class="row-edit-item row-delete-selected"><a href="#" data-action="delete_selected">Delete Selected…</a></li>
+      <li class="row-edit-item"><a href="#" data-action="set_null">Set NULL</a></li>
+      <li class="row-edit-item"><a href="#" data-action="delete_row">Delete Row…</a></li>
     </ul>
   </div>
   <div id="error_banner"></div>
