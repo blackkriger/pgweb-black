@@ -586,6 +586,20 @@
   padding-left: 15px;
 }
 
+/* Leading row-selection checkbox column — shrink to content, center the box. */
+#results th.row-select-col,
+#results td.row-select-col {
+  width: 1%;
+  white-space: nowrap;
+  padding: 0 6px;
+  text-align: center;
+}
+#results td.row-select-col input.row-select-box {
+  margin: 0;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
 #results.no-crop td div {
   max-width: none;
 }
@@ -1140,7 +1154,7 @@ body.office98 #input .input-wrapper #custom_query {
 #rows_query_editor {
   flex: 1 1 auto;
   min-width: 0;
-  height: 80px;
+  height: 60px;
   min-height: 24px;
   font-size: 13px;
   border: 1px solid #ccc;

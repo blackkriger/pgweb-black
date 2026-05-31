@@ -443,6 +443,9 @@ function buildTable(results, sortColumn, sortOrder, options) {
   var cols = "";
   var rows = "";
 
+  // Leading checkbox column for row multi-selection (browse views only).
+  if (options.selectable) cols += "<th class='row-select-col'></th>";
+
   results.columns.forEach(function(col) {
     if (col === sortColumn) {
       cols += "<th class='table-header-col active' data-name='" + col + "' data-order=" + sortOrder + ">" + col + "&nbsp;" + sortArrow(sortOrder) + "</th>";
@@ -462,9 +465,12 @@ function buildTable(results, sortColumn, sortOrder, options) {
   results.rows.forEach(function(row) {
     var r = "";
 
-    // Add all actual row data here
+    // Leading checkbox cell — checked mirrors the row's .selected state.
+    if (options.selectable) r += "<td class='row-select-col'><input type='checkbox' class='row-select-box' /></td>";
+
+    // Add all actual row data here. data-name carries the column name so cell edit / Set NULL / delete / filter resolve it without a positional th lookup (the leading checkbox column would otherwise shift those indices).
     for (i in row) {
-      r += "<td data-col='" + i + "'><div>" + escapeHtml(row[i]) + "</div></td>";
+      r += "<td data-col='" + i + "' data-name='" + results.columns[i] + "'><div>" + escapeHtml(row[i]) + "</div></td>";
     }
 
     // Add row action button
@@ -649,7 +655,7 @@ function showTableContent(sortColumn, sortOrder) {
       layoutRowsQuery();
     }
 
-    buildTable(data, sortColumn, sortOrder);
+    buildTable(data, sortColumn, sortOrder, { selectable: true });
     setCurrentTab("table_content");
     updatePaginator(data.pagination);
 
@@ -672,7 +678,7 @@ function runRowsQuery() {
 
   var table = $("#results").data("table");
   executeQuery(sql, function(data) {
-    buildTable(data);
+    buildTable(data, null, null, { selectable: true });
     $("#results").data("mode", "browse").data("table", table);
   });
 }
@@ -1366,9 +1372,8 @@ function bindTableHeaderMenu() {
           deleteRow($(context).closest("tr"));
           break;
         case "filter_by_value":
-          var colIdx   = $(context).data("col");
           var colValue = $(context).text();
-          var colName  = $("#results_header th").eq(colIdx).data("name");
+          var colName  = $(context).data("name");
 
           $("select.column").val(colName);
           $("select.filter").val("equal");
@@ -1624,7 +1629,7 @@ function renderCellValue($div, value) {
 function collectRowValues($tr) {
   var values = {};
   $tr.children("td[data-col]").each(function() {
-    var name = $("#results_header th").eq($(this).data("col")).data("name");
+    var name = $(this).data("name");
     if (name != null) values[name] = cellValue($(this).children("div"));
   });
   return values;
@@ -1660,7 +1665,7 @@ function setCellNull($div) {
   if ($("#results").data("mode") != "browse") return;
 
   var $td = $div.parent();
-  var column = $("#results_header th").eq($td.data("col")).data("name");
+  var column = $td.data("name");
   if (column == null || cellValue($div) === null) return;
 
   saveCellValue($div, column, "", true, collectRowValues($td.closest("tr")), cellValue($div));
@@ -1685,19 +1690,25 @@ function deleteRow($tr) {
   });
 }
 
-// Row multi-selection. The .selected class is the single source of truth (styled in app.css).
-// A selection is started from the "Select Row" context-menu item; once at least one row is selected, plain left-clicks on rows toggle their selection so several can be picked at once.
+// Row multi-selection. The .selected class on the <tr> is the source of truth (styled in app.css); the leading checkbox column mirrors it. A left-click anywhere on a row SELECTS it (sets the checkbox true) additively — it never clears the other rows' selection. To deselect a single row, untick its checkbox; Esc (or "Delete Selected") clears everything.
 function selectedRowCount() {
   return $("#results_body tr.selected").length;
 }
 
+function setRowSelected($tr, on) {
+  if (!$tr || !$tr.length) return;
+  $tr.toggleClass("selected", on);
+  $tr.find("input.row-select-box").prop("checked", on);
+}
+
 function toggleRowSelection($tr) {
   if ($("#results").data("mode") != "browse") return;
-  if ($tr && $tr.length) $tr.toggleClass("selected");
+  if ($tr && $tr.length) setRowSelected($tr, !$tr.hasClass("selected"));
 }
 
 function clearRowSelection() {
   $("#results_body tr.selected").removeClass("selected");
+  $("#results_body input.row-select-box:checked").prop("checked", false);
 }
 
 function deleteSelectedRows() {
@@ -1735,7 +1746,7 @@ function startCellEdit($div) {
   if ($div.children("textarea").length) return;
 
   var $td = $div.parent();
-  var column = $("#results_header th").eq($td.data("col")).data("name");
+  var column = $td.data("name");
   if (column == null) return;
 
   var original  = cellValue($div);
@@ -1823,12 +1834,17 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // Once a selection exists (started from the row context menu), plain left-clicks on rows toggle their selection so several rows can be picked for a bulk delete.
+  // Left-click anywhere on a row selects it (ticks its checkbox), additively — previously selected rows stay selected. Clicks on the checkbox itself are handled by its change event below (so it can also untick), and clicks inside an open cell editor are ignored.
   $("#results_body").on("click", "tr", function(e) {
     if ($("#results").data("mode") != "browse") return;
-    if (selectedRowCount() === 0) return;
+    if ($(e.target).is("input.row-select-box")) return;
     if ($(e.target).closest("td > div.editing").length) return;
-    toggleRowSelection($(this));
+    setRowSelected($(this), true);
+  });
+
+  // The checkbox is the one control that can also DEselect a row — keep .selected in sync with it.
+  $("#results_body").on("change", "input.row-select-box", function() {
+    $(this).closest("tr").toggleClass("selected", this.checked);
   });
 
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
