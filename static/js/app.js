@@ -1963,6 +1963,10 @@ $(document).ready(function() {
 
   $("#results").on("click", "th", function(e) {
     if (!$("#table_content").hasClass("selected")) return;
+    // Non-data headers (the select-all checkbox column, the action column) have
+    // no column name — clicking them must NOT trigger a sort + table re-render
+    // (that was wiping the select-all selection the instant it was made).
+    if (!$(this).data("name")) return;
 
     var sortColumn = $(this).data("name");
     var sortOrder  = $(this).data("order") === "ASC" ? "DESC" : "ASC";
