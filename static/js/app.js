@@ -1690,20 +1690,39 @@ function deleteRow($tr) {
   });
 }
 
-// Row multi-selection. The .selected class on the <tr> is the source of truth (styled in app.css); the leading checkbox column mirrors it. A left-click anywhere on a row SELECTS it (sets the checkbox true) additively — it never clears the other rows' selection. To deselect a single row, untick its checkbox; Esc (or "Delete Selected") clears everything.
+// Row selection. The .selected class on the <tr> is pgweb's original row highlight and the single source of truth — bulk delete operates on it. The leading checkbox mirrors it: a ticked checkbox always means the row is .selected, and vice versa in checkbox mode.
+//
+// Two modes, keyed off whether ANY checkbox is currently ticked:
+//   * none ticked  -> a left-click is a vanilla single select: highlight only that row (replacing the previous), no checkbox involved.
+//   * >=1 ticked    -> "checkbox mode": a left-click ticks + highlights the row additively, keeping the existing selection. Entered by ticking a checkbox or via the context-menu "Select Row".
 function selectedRowCount() {
   return $("#results_body tr.selected").length;
 }
 
+function checkedRowCount() {
+  return $("#results_body input.row-select-box:checked").length;
+}
+
+// Tick (or untick) a row's checkbox and keep its highlight in lockstep.
 function setRowSelected($tr, on) {
   if (!$tr || !$tr.length) return;
   $tr.toggleClass("selected", on);
   $tr.find("input.row-select-box").prop("checked", on);
 }
 
+// In checkbox mode the highlight set IS the ticked set — drop any leftover boxless single-select highlight so the two can never diverge.
+function syncHighlightToCheckboxes() {
+  $("#results_body tr.selected").each(function() {
+    if (!$(this).find("input.row-select-box").prop("checked")) $(this).removeClass("selected");
+  });
+}
+
+// Context-menu "Select Row" / "Deselect Row" — ticks the checkbox (so it enters checkbox mode).
 function toggleRowSelection($tr) {
   if ($("#results").data("mode") != "browse") return;
-  if ($tr && $tr.length) setRowSelected($tr, !$tr.hasClass("selected"));
+  if (!$tr || !$tr.length) return;
+  setRowSelected($tr, !$tr.hasClass("selected"));
+  syncHighlightToCheckboxes();
 }
 
 function clearRowSelection() {
@@ -1834,17 +1853,28 @@ function bindContentModalEvents() {
     startCellEdit($(this));
   });
 
-  // Left-click anywhere on a row selects it (ticks its checkbox), additively — previously selected rows stay selected. Clicks on the checkbox itself are handled by its change event below (so it can also untick), and clicks inside an open cell editor are ignored.
+  // Left-click on a row. With no checkbox ticked it's a vanilla single select (highlight only
+  // this row, replacing the previous, no checkbox). Once any checkbox is ticked we're in
+  // checkbox mode: the click ticks + highlights this row additively. Clicks on the checkbox
+  // itself are handled by its change event below; clicks inside an open cell editor are ignored.
   $("#results_body").on("click", "tr", function(e) {
     if ($("#results").data("mode") != "browse") return;
     if ($(e.target).is("input.row-select-box")) return;
     if ($(e.target).closest("td > div.editing").length) return;
-    setRowSelected($(this), true);
+
+    if (checkedRowCount() > 0) {
+      setRowSelected($(this), true);
+    } else {
+      $("#results_body tr.selected").removeClass("selected");
+      $(this).addClass("selected");
+    }
   });
 
-  // The checkbox is the one control that can also DEselect a row — keep .selected in sync with it.
+  // The checkbox drives the highlight (ticked => selected, unticked => not), and ticking one
+  // promotes a prior boxless single-select into checkbox mode (so highlight == ticked set).
   $("#results_body").on("change", "input.row-select-box", function() {
     $(this).closest("tr").toggleClass("selected", this.checked);
+    if (this.checked) syncHighlightToCheckboxes();
   });
 
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
