@@ -1,8 +1,8 @@
-# pgweb-My_games
+# pgweb-black
 
 A fork of [sosedoff/pgweb](https://github.com/sosedoff/pgweb) — a simple, cross-platform, web-based PostgreSQL database explorer — with **inline cell editing** added on top. 
 
-This is a fork maintained for the [My_games](https://my-games.uk) project. 
+Originally forked for the [My_games](https://my-games.uk) project. 
 
 ## What this fork adds
 
