@@ -660,6 +660,7 @@ function showTableContent(sortColumn, sortOrder) {
     updatePaginator(data.pagination);
 
     $("#results").data("mode", "browse").data("table", name);
+    fetchFkMap(name, $.noop);
   });
 }
 
@@ -680,6 +681,7 @@ function runRowsQuery() {
   executeQuery(sql, function(data) {
     buildTable(data, null, null, { selectable: true });
     $("#results").data("mode", "browse").data("table", table);
+    fetchFkMap(table, $.noop);
   });
 }
 
@@ -1341,15 +1343,34 @@ function bindTableHeaderMenu() {
         // One delete entry: bulk when rows are checkbox-selected, single row otherwise.
         $("#results_row_menu [data-action='delete_row']").text(selected > 0 ? "Delete Selected (" + selected + ")…" : "Delete Row…");
       }
+
+      // FK navigation: a top "Go to <table>.<column>" entry for a foreign-key cell (browse only, non-null). fkCache is warmed when the table loads.
+      var fk = null, fkVal = null;
+      if (editable) {
+        var $td = $(e.target).closest("td");
+        var col = $td.data("name");
+        var map = fkCache[$("#results").data("table")] || {};
+        var $div = $td.children("div");
+        if (col && map[col] && !$div.children("span.null").length) {
+          fk = map[col];
+          fkVal = $div.text();
+        }
+      }
+      $("#results_row_menu .fk-goto-item, #results_row_menu .fk-goto-divider").toggle(!!fk);
+      if (fk) {
+        $("#results_row_menu [data-action='fk_goto']").text("Go to " + fk.table + "." + fk.column).data("fk", fk).data("fkval", fkVal);
+      }
     },
     onItem: function(context, e) {
       var menuItem = $(e.target);
 
       switch(menuItem.data("action")) {
+        case "fk_goto":
+          var fk = $("#results_row_menu [data-action='fk_goto']").data("fk");
+          if (fk) openFkTarget(fk.table, fk.column, $("#results_row_menu [data-action='fk_goto']").data("fkval"));
+          break;
         case "display_value":
-          var value = $(context).text();
-          $("#content_modal .content").text(value);
-          $("#content_modal").show();
+          showCellModal($(context).text());
           break;
         case "copy_value":
           copyToClipboard($(context).text());
@@ -1600,8 +1621,7 @@ function onInputResize(event) {
 
 // Read-only value viewer, used outside the browse view where rows are not editable.
 function displayCellValue($div) {
-  $("#content_modal .content").text($div.text());
-  $("#content_modal").show();
+  showCellModal($div.text());
 }
 
 // Original value of a cell div: null for SQL NULL, otherwise its text.
@@ -1764,11 +1784,15 @@ function startCellEdit($div) {
 
   var original  = cellValue($div);
   var rowValues = collectRowValues($td.closest("tr"));
-  var text      = original === null ? "" : original;
+  // JSON/JSONB cells open pretty-printed for readable multi-line editing.
+  var jsonVal   = original === null ? undefined : parseJsonValue(original);
+  var isJson    = jsonVal !== undefined;
+  var text      = original === null ? "" : (isJson ? JSON.stringify(jsonVal, null, 2) : original);
 
   var $editor = $("<textarea class='cell-editor' spellcheck='false'></textarea>")
-    .attr("rows", Math.min(8, text.split("\n").length))
+    .attr("rows", Math.min(isJson ? 18 : 8, Math.max(1, text.split("\n").length)))
     .val(text);
+  if (isJson) $editor.addClass("cell-editor--json").attr("title", "Ctrl+Enter to save, Esc to cancel");
 
   $div.addClass("editing").html($editor);
   $editor.focus()[0].select();
@@ -1781,29 +1805,55 @@ function startCellEdit($div) {
     renderCellValue($div, original);
   }
 
-  function commit() {
+  // viaBlur: on blur an invalid-JSON edit is discarded (no stuck editor);
+  // an explicit Ctrl+Enter keeps editing so the typo can be fixed.
+  function finish(viaBlur) {
     if (settled) return;
-    settled = true;
 
     var next = $editor.val();
     if ((original === null && next === "") || next === original) {
+      settled = true;
       renderCellValue($div, original);
       return;
     }
+
+    if (isJson) {
+      var parsed;
+      try {
+        parsed = JSON.parse(next);
+      } catch (err) {
+        if (viaBlur) { settled = true; renderCellValue($div, original); showErrorBanner("Invalid JSON — edit discarded"); return; }
+        showErrorBanner("Invalid JSON: " + err.message);
+        $editor.focus();
+        return;
+      }
+      var canonical = JSON.stringify(parsed);
+      if (canonical === JSON.stringify(jsonVal)) { settled = true; renderCellValue($div, original); return; }
+      settled = true;
+      saveCellValue($div, column, canonical, false, rowValues, original);
+      return;
+    }
+
+    settled = true;
     saveCellValue($div, column, next, false, rowValues, original);
   }
 
   $editor.on("keydown", function(e) {
-    if (e.keyCode == 13 && !e.shiftKey) {
-      e.preventDefault();
-      commit();
+    if (e.keyCode == 13) {
+      // JSON: Enter = newline, Ctrl/Cmd+Enter = save. Plain: Enter = save, Shift+Enter = newline.
+      if (isJson) {
+        if (e.ctrlKey || e.metaKey) { e.preventDefault(); finish(false); }
+      } else if (!e.shiftKey) {
+        e.preventDefault();
+        finish(false);
+      }
     } else if (e.keyCode == 27) {
       e.preventDefault();
       cancel();
     }
   });
 
-  $editor.on("blur", commit);
+  $editor.on("blur", function() { finish(true); });
 }
 
 // Theme cycling. Each theme id doubles as the <body> class ("classic" = none). The button shows the active theme; clicking advances to the next one. The choice is persisted in localStorage. A previously stored theme that's no longer offered (e.g. the removed "bios") falls back to classic.
@@ -1822,6 +1872,133 @@ function applyTheme() {
   $("#toggle_theme").text(THEME_LABELS[t]);
 }
 
+// ---- JSONB viewer ---------------------------------------------------------
+
+// Parse a cell string into a JSON object/array, or undefined if it isn't one.
+function parseJsonValue(s) {
+  if (typeof s !== "string") return undefined;
+  var t = s.trim();
+  if (t === "" || (t[0] !== "{" && t[0] !== "[")) return undefined;
+  try {
+    var v = JSON.parse(t);
+    return (v !== null && typeof v === "object") ? v : undefined;
+  } catch (e) { return undefined; }
+}
+
+function jtEsc(s) { return jQuery("<div/>").text(s).html(); }
+
+// Recursive, collapsible, syntax-highlighted JSON tree as an HTML string.
+function jtRender(v) {
+  if (v === null) return '<span class="jt-null">null</span>';
+  var t = typeof v;
+  if (t === "string")  return '<span class="jt-str">"' + jtEsc(v) + '"</span>';
+  if (t === "number")  return '<span class="jt-num">' + v + '</span>';
+  if (t === "boolean") return '<span class="jt-bool">' + v + '</span>';
+  if (Array.isArray(v)) {
+    if (!v.length) return '<span class="jt-punc">[ ]</span>';
+    var inner = v.map(function(item, i) {
+      return '<div class="jt-row">' + jtRender(item) + (i < v.length - 1 ? '<span class="jt-punc">,</span>' : '') + '</div>';
+    }).join("");
+    return '<span class="jt-tog" role="button">▾</span><span class="jt-punc">[</span><span class="jt-count" style="display:none">' + v.length + ' items</span>' +
+           '<div class="jt-children">' + inner + '</div><span class="jt-punc">]</span>';
+  }
+  if (t === "object") {
+    var keys = Object.keys(v);
+    if (!keys.length) return '<span class="jt-punc">{ }</span>';
+    var inner = keys.map(function(k, i) {
+      return '<div class="jt-row"><span class="jt-key">"' + jtEsc(k) + '"</span><span class="jt-punc">: </span>' +
+             jtRender(v[k]) + (i < keys.length - 1 ? '<span class="jt-punc">,</span>' : '') + '</div>';
+    }).join("");
+    return '<span class="jt-tog" role="button">▾</span><span class="jt-punc">{</span><span class="jt-count" style="display:none">' + keys.length + ' keys</span>' +
+           '<div class="jt-children">' + inner + '</div><span class="jt-punc">}</span>';
+  }
+  return jtEsc(String(v));
+}
+
+// Show a cell value in the modal: a JSON tree when it parses as object/array, plain text otherwise.
+function showCellModal(value) {
+  var $content = $("#content_modal .content");
+  var json = parseJsonValue(value);
+  if (json !== undefined) {
+    $content.addClass("jt-mode").html(jtRender(json));
+    $("#content_modal").data("copy", JSON.stringify(json, null, 2));
+  } else {
+    $content.removeClass("jt-mode").text(value == null ? "" : value);
+    $("#content_modal").removeData("copy");
+  }
+  $("#content_modal").show();
+}
+
+// ---- Foreign-key navigation ----------------------------------------------
+
+var fkCache = {};
+
+function fkUnquote(s) {
+  s = (s || "").trim();
+  if (s.length >= 2 && s[0] === '"' && s[s.length - 1] === '"') s = s.slice(1, -1).replace(/""/g, '"');
+  return s;
+}
+
+// Parse FOREIGN KEY definitions from /constraints into { localCol: {table, column} }. Single-column FKs only.
+function parseFkMap(data) {
+  var map = {};
+  if (!data || !data.rows) return map;
+  var di = data.columns ? data.columns.indexOf("definition") : 1;
+  data.rows.forEach(function(row) {
+    var def = row[di];
+    if (typeof def !== "string") return;
+    var m = def.match(/^FOREIGN KEY \(([^)]+)\) REFERENCES (.+?)\s*\(([^)]+)\)/i);
+    if (!m) return;
+    var local = m[1].split(",").map(fkUnquote), target = m[3].split(",").map(fkUnquote);
+    if (local.length !== 1 || target.length !== 1) return;
+    map[local[0]] = { table: m[2].trim().replace(/"/g, ""), column: target[0] };
+  });
+  return map;
+}
+
+function fetchFkMap(table, cb) {
+  if (fkCache[table]) { cb(fkCache[table]); return; }
+  getTableConstraints(table, function(data) {
+    fkCache[table] = (data && !data.error) ? parseFkMap(data) : {};
+    cb(fkCache[table]);
+  });
+}
+
+// Open the FK target table filtered to the referenced row ("col" = value).
+function openFkTarget(targetTable, targetColumn, value) {
+  var $li = $("#objects li.schema-item").filter(function() {
+    return $(this).data("id") === targetTable || $(this).data("name") === targetTable;
+  }).first();
+  if (!$li.length) { showErrorBanner("Table '" + targetTable + "' not found in the sidebar"); return; }
+
+  currentObject = { name: $li.data("id"), type: $li.data("type") };
+  $("#objects li").removeClass("active");
+  $li.addClass("active");
+  $(".current-page").data("page", 1);
+  $(".filters select, .filters input").val("");
+  sessionStorage.setItem("tab", "table_content");
+  showTableInfo();
+
+  var name  = currentObject.name;
+  var where = '"' + targetColumn + '" ' + filterOptions["equal"].replace("DATA", value);
+  var opts  = { limit: getRowsLimit(), offset: 0, where: where };
+  getTableRows(name, opts, function(data) {
+    $("#input").hide();
+    $("#body").prop("class", "with-pagination with-rows-query");
+    if (rowsEditor) {
+      rowsEditor.setValue(buildBrowseQuery(name, opts));
+      rowsEditor.clearSelection();
+      rowsEditor.resize();
+      layoutRowsQuery();
+    }
+    buildTable(data, null, null, { selectable: true });
+    setCurrentTab("table_content");
+    updatePaginator(data.pagination);
+    $("#results").data("mode", "browse").data("table", name);
+    fetchFkMap(name, $.noop);
+  });
+}
+
 function bindContentModalEvents() {
   var contentModal = document.getElementById("content_modal");
 
@@ -1835,12 +2012,24 @@ function bindContentModalEvents() {
   $("#content_modal .content-modal-action").on("click", function() {
     switch ($(this).data("action")) {
       case "copy":
-        copyToClipboard($("#content_modal pre").text());
+        // For a JSON value copy the pretty-printed form, otherwise the raw text.
+        var custom = $("#content_modal").data("copy");
+        copyToClipboard(custom != null ? custom : $("#content_modal pre").text());
         break;
       case "close":
         $("#content_modal").hide();
         break;
     }
+  });
+
+  // Collapse / expand a JSON tree node.
+  $("#content_modal").on("click", ".jt-tog", function(e) {
+    e.stopPropagation();
+    var $t = $(this);
+    var collapse = !$t.hasClass("collapsed");
+    $t.toggleClass("collapsed", collapse).html(collapse ? "▸" : "▾");
+    $t.siblings(".jt-count").toggle(collapse);
+    $t.siblings(".jt-children").toggle(!collapse);
   });
 
   $("#results").on("dblclick", "td > div", function() {

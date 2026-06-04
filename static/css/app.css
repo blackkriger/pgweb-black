@@ -1230,3 +1230,33 @@ body.office98 #rows_query { background: var(--face); border-bottom: 1px solid va
 body.office98 #rows_query_editor { border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); }
 body.office98 #rows_query .btn { color: #000; background: var(--face); border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); box-shadow: inset 1px 1px 0 0 var(--hi-soft), inset -1px -1px 0 0 var(--sh); }
 body.office98 #rows_query .btn:active { border-color: var(--dk) var(--hi) var(--hi) var(--dk); box-shadow: inset 1px 1px 0 0 var(--sh), inset -1px -1px 0 0 var(--hi-soft); }
+
+/* JSONB tree viewer in the cell-value modal (shown when the value parses as JSON). */
+#content_modal .content.jt-mode {
+  white-space: normal;
+  word-break: break-word;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+  text-align: left;
+  color: #333;
+}
+#content_modal .content.jt-mode .jt-children { margin-left: 14px; border-left: 1px dotted #dcdcdc; padding-left: 8px; }
+#content_modal .content.jt-mode .jt-row { padding: 1px 0; }
+#content_modal .content.jt-mode .jt-key { color: #79589f; }
+#content_modal .content.jt-mode .jt-str { color: #6a8c1f; }
+#content_modal .content.jt-mode .jt-num { color: #c0392b; }
+#content_modal .content.jt-mode .jt-bool { color: #2c6fbb; }
+#content_modal .content.jt-mode .jt-null { color: #999; font-style: italic; }
+#content_modal .content.jt-mode .jt-punc { color: #999; }
+#content_modal .content.jt-mode .jt-count { color: #aaa; font-size: 11px; padding: 0 6px; }
+#content_modal .content.jt-mode .jt-tog { display: inline-block; width: 12px; text-align: center; cursor: pointer; color: #999; user-select: none; }
+#content_modal .content.jt-mode .jt-tog:hover { color: #333; }
+
+/* Inline editor for JSON/JSONB cells — monospace, preserve formatting. */
+#results td textarea.cell-editor--json {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-size: 12px;
+  white-space: pre;
+  tab-size: 2;
+}
