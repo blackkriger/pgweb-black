@@ -1242,6 +1242,10 @@ body.office98 #input .input-wrapper #custom_query {
   background: #fff;
 }
 #rows_query .btn:hover { border-color: #64903e; color: #64903e; background: #fff; }
+/* Run on top, query execution time pinned to the bottom of the bar. */
+.rows-query-actions { flex: 0 0 auto; align-self: stretch; display: flex; flex-direction: column; justify-content: space-between; align-items: stretch; }
+#rows_query_sql { font-size: 11px; color: #999; text-align: left; line-height: 13px; padding-bottom: 2px; }
+body.office98 #rows_query_sql { color: #555; }
 /* Pull the pagination up 1px so it overlaps the query bar's bottom edge — kills
    the hairline seam (border + a sub-pixel sliver of the teal desktop showing
    through from rounding) that looked like a gap between the two bars. */

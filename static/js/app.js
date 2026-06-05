@@ -309,9 +309,7 @@ function resetTable() {
     show();
 }
 
-// Client-side quick filter: hide rows on the current page whose data cells don't
-// contain the typed substring (case-insensitive, all columns). Pure DOM, no
-// server round-trip — complements the SQL query bar.
+// Client-side quick filter: hide rows on the current page whose data cells don't contain the typed substring (case-insensitive, all columns). Pure DOM, no server round-trip — complements the SQL query bar.
 function applyQuickFilter() {
   var q = $.trim($("#rows_quickfilter").val() || "").toLowerCase();
   var $rows = $("#results_body tr");
@@ -430,11 +428,22 @@ function sortArrow(direction) {
   }
 }
 
+// Precise server-side query time for the Query page (microsecond resolution; sub-ms queries would otherwise round to "0 ms"). Falls back to the integer ms field.
+function serverQueryTime(stats) {
+  if (!stats) return "";
+  if (typeof stats.query_total_us === "number") {
+    return parseFloat((stats.query_total_us / 1000).toFixed(2)) + " ms";
+  }
+  return stats.query_duration_ms + " ms";
+}
+
 function buildTable(results, sortColumn, sortOrder, options) {
   if (!options) options = {};
   var action = options.action;
 
   resetTable();
+  // Query execution time (server) pinned to the bottom of the query bar.
+  $("#rows_query_sql").text(results.stats ? results.stats.query_duration_ms + " ms" : "");
 
   if (results.error) {
     $("#results_header").html("");
@@ -446,7 +455,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
     $("#results_header").html("");
     $("#results_body").html("<tr><td>No records found</td></tr>");
     if (results.stats) {
-      $("#result-rows-count").html(results.stats.query_duration_ms + " ms");
+      $("#result-rows-count").html(serverQueryTime(results.stats));
     } else {
       $("#result-rows-count").html("");
     }
@@ -500,7 +509,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
 
   // Show number of rows rendered on the page
   if (results.stats) {
-    $("#result-rows-count").html(results.stats.rows_count + " rows in " + results.stats.query_duration_ms + " ms");
+    $("#result-rows-count").html(results.stats.rows_count + " rows in " + serverQueryTime(results.stats));
   } else {
     $("#result-rows-count").html(results.rows.length + " rows");
   }
@@ -1156,7 +1165,6 @@ function addShortcutTooltips() {
 function getLatestReleaseInfo(current) {
   try {
     $.get("https://api.github.com/repos/blackkriger/pgweb-black/releases/latest", function(release) {
-      // Releases are tagged like "v0.17.4-black"; the running version const is "0.17.4-black".
       var latest = (release.tag_name || release.name || "").replace(/^v/, "");
       if (latest && latest != current.version) {
         var message = "Update available — " + release.tag_name + " on <a target='_blank' href='https://github.com/blackkriger/pgweb-black/releases/latest'>GitHub</a>";
@@ -1367,8 +1375,7 @@ function bindTableHeaderMenu() {
           }
           break;
         case "filter_by_value":
-          // The dedicated search form is gone — express the filter in the editable
-          // query bar instead (same result, fully editable afterwards).
+          // The dedicated search form is gone — express the filter in the editable query bar instead (same result, fully editable afterwards).
           if ($("#results").data("mode") != "browse" || !rowsEditor) break;
           var t = $("#results").data("table");
           var colName = $(context).data("name");
@@ -1985,9 +1992,7 @@ function openFkTarget(targetTable, targetColumn, value) {
   });
 }
 
-// Build an INSERT statement for a whole row and copy it to the clipboard. Every
-// value is emitted as a quoted literal (NULL kept as NULL) — Postgres casts them
-// to each column's type on INSERT, so int / uuid / jsonb / bool all round-trip.
+// Build an INSERT statement for a whole row and copy it to the clipboard 
 function copyRowAsInsert($tr) {
   var table = $("#results").data("table");
   if (!table) return;

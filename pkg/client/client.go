@@ -467,11 +467,12 @@ func (client *Client) exec(query string, args ...interface{}) (*Result, error) {
 			{affected},
 		},
 		Stats: &ResultStats{
-			ColumnsCount:    1,
-			RowsCount:       1,
-			QueryStartTime:  queryStart.UTC(),
-			QueryFinishTime: queryFinish.UTC(),
-			QueryDuration:   queryFinish.Sub(queryStart).Milliseconds(),
+			ColumnsCount:     1,
+			RowsCount:        1,
+			QueryStartTime:   queryStart.UTC(),
+			QueryFinishTime:  queryFinish.UTC(),
+			QueryDuration:    queryFinish.Sub(queryStart).Milliseconds(),
+			QueryTotalMicros: queryFinish.Sub(queryStart).Microseconds(),
 		},
 	}
 
@@ -555,12 +556,14 @@ func (client *Client) query(query string, args ...interface{}) (*Result, error) 
 		}
 	}
 
+	queryTotalFinish := time.Now()
 	result.Stats = &ResultStats{
-		ColumnsCount:    len(cols),
-		RowsCount:       len(result.Rows),
-		QueryStartTime:  queryStart.UTC(),
-		QueryFinishTime: queryFinish.UTC(),
-		QueryDuration:   queryFinish.Sub(queryStart).Milliseconds(),
+		ColumnsCount:     len(cols),
+		RowsCount:        len(result.Rows),
+		QueryStartTime:   queryStart.UTC(),
+		QueryFinishTime:  queryFinish.UTC(),
+		QueryDuration:    queryFinish.Sub(queryStart).Milliseconds(),
+		QueryTotalMicros: queryTotalFinish.Sub(queryStart).Microseconds(),
 	}
 
 	result.PostProcess()

@@ -55,6 +55,8 @@ type (
 		QueryStartTime  time.Time `json:"query_start_time"`
 		QueryFinishTime time.Time `json:"query_finish_time"`
 		QueryDuration   int64     `json:"query_duration_ms"`
+		// Full server-side time in microseconds: from queryStart until every row is fetched into pgweb (execution + row fetch), no integer rounding. Used for the Query page's precise timing; excludes JSON transfer + browser render.
+		QueryTotalMicros int64 `json:"query_total_us"`
 	}
 
 	Object struct {
