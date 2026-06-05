@@ -477,6 +477,26 @@
   height: 32px;
 }
 
+/* Client-side quick filter — sits on the left of the pagination bar (where the old server search used to be). */
+#pagination .rows-quickfilter {
+  float: left;
+  font-size: 12px;
+  line-height: 32px;
+  height: 32px;
+  color: #999;
+}
+#pagination .rows-quickfilter input {
+  width: 200px;
+  height: 26px;
+  margin-left: 8px;
+  padding: 0 8px;
+  font-size: 12px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  vertical-align: middle;
+  outline: none;
+}
+
 #results {
   font-size: 12px;
   margin: 0px;
@@ -1059,6 +1079,8 @@ body.office98 #pagination .filters span,
 body.office98 #pagination .current-page { color: #000; }
 body.office98 #pagination .filters input,
 body.office98 #pagination .filters select { background: #fff; color: #000; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); }
+body.office98 #pagination .rows-quickfilter { color: #000; }
+body.office98 #pagination .rows-quickfilter input { background: #fff; color: #000; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); border-radius: 0; }
 body.office98 #pagination .btn-default,
 body.office98 #pagination .filters .btn-primary {
   background: var(--face); color: #000;
@@ -1118,6 +1140,8 @@ body.office98 #connection_window { background: var(--desktop); color: #000; }
 body.office98 .connection-settings .header h1 { color: #fff; font-family: 'MS Sans Serif', Tahoma, sans-serif; text-shadow: 1px 1px 0 #000; }
 body.office98 .connection-settings .header .version,
 body.office98 .connection-settings .connection-ssh-group h3 { color: #fff; }
+body.office98 .connection-settings .header .update { background: #ffffe1; color: #000; border: 1px solid #000; border-radius: 0; box-shadow: none; font-family: 'MS Sans Serif', Tahoma, sans-serif; }
+body.office98 .connection-settings .header .update a { color: var(--navy); }
 body.office98 .connection-settings form {
   background: var(--face);
   border: 2px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi);

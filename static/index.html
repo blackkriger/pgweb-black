@@ -119,26 +119,10 @@
         <button type="button" class="btn btn-primary btn-sm" id="rows_query_run">Run</button>
       </div>
       <div id="pagination">
-        <form class="filters" action="#" id="rows_filter">
-          <span>Search</span>
-          <select class="column form-control"></select>
-          <select class="filter form-control">
-            <option value="">Select filter</option>
-            <option value="equal">=</option>
-            <option value="not_equal">&ne;</option>
-            <option value="greater">&gt;</option>
-            <option value="greater_eq">&ge;</option>
-            <option value="less">&lt;</option>
-            <option value="less_eq">&le;</option>
-            <option value="like">LIKE</option>
-            <option value="ilike">ILIKE</option>
-            <option value="null">IS NULL</option>
-            <option value="not_null">NOT NULL</option>
-          </select>
-          <input type="text" class="form-control" placeholder="Filter value" id="table_filter_value" />
-          <button class="btn btn-primary btn-sm apply-filters" type="submit">Apply</button>
-          <button class="btn btn-default btn-sm reset-filters"><i class="fa fa-times"></i></button>
-        </form>
+        <div class="rows-quickfilter">
+          <span>Filter rows:</span>
+          <input type="text" id="rows_quickfilter" placeholder="Search this page" autocomplete="off" />
+        </div>
         <div class="btn-group">
           <button type="button" class="btn btn-default btn-sm prev-page" disabled="disabled"><i class="fa fa-angle-left"></i></button>
           <button type="button" class="btn btn-default btn-sm page change-limit" title="Click to change row limit"></button>
@@ -351,6 +335,7 @@
       <li class="fk-goto-divider divider"></li>
       <li><a href="#" data-action="display_value">Display Value</a></li>
       <li><a href="#" data-action="copy_value">Copy Value</a></li>
+      <li><a href="#" data-action="copy_row">Copy Row as INSERT</a></li>
       <li><a href="#" data-action="filter_by_value">Filter Rows By Value</a></li>
       <li class="divider edit-divider"></li>
       <li class="row-edit-item"><a href="#" data-action="set_null">Set NULL</a></li>

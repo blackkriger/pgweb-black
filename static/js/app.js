@@ -300,12 +300,26 @@ function resetTable() {
   $("#results_header").html("");
   $("#results_body").html("");
   $("#results_view").html("").hide();
+  $("#rows_quickfilter").val("");
 
   $("#results").
     data("mode", "").
     removeClass("empty").
     removeClass("no-crop").
     show();
+}
+
+// Client-side quick filter: hide rows on the current page whose data cells don't
+// contain the typed substring (case-insensitive, all columns). Pure DOM, no
+// server round-trip — complements the SQL query bar.
+function applyQuickFilter() {
+  var q = $.trim($("#rows_quickfilter").val() || "").toLowerCase();
+  var $rows = $("#results_body tr");
+  if (!q) { $rows.show(); return; }
+  $rows.each(function() {
+    var $tr = $(this);
+    $tr.toggle($tr.children("td[data-name]").text().toLowerCase().indexOf(q) >= 0);
+  });
 }
 
 function performTableAction(table, action, el) {
@@ -574,8 +588,6 @@ function showTableInfo() {
     $("#table_rows_count").text(data.rows_count);
     $("#table_encoding").text("Unknown");
   });
-
-  buildTableFilters(name, getCurrentObject().type);
 }
 
 function updatePaginator(pagination) {
@@ -628,22 +640,6 @@ function showTableContent(sortColumn, sortOrder) {
     sort_column: sortColumn,
     sort_order:  sortOrder
   };
-
-  var filter = {
-    column: $(".filters select.column").val(),
-    op:     $(".filters select.filter").val(),
-    input:  $(".filters input").val()
-  };
-
-  // Apply filtering only if column is selected
-  if (filter.column && filter.op) {
-    var where = [
-      '"' + filter.column + '"',
-      filterOptions[filter.op].replace("DATA", filter.input)
-    ].join(" ");
-
-    opts["where"] = where;
-  }
 
   getTableRows(name, opts, function(data) {
     $("#input").hide();
@@ -1040,26 +1036,6 @@ function showFieldNumStats(table, column) {
   });
 }
 
-function buildTableFilters(name, type) {
-  getTableStructure(name, { type: type }, function(data) {
-    if (data.rows.length == 0) {
-      $("#pagination .filters").hide();
-    }
-    else {
-      $("#pagination .filters").show();
-    }
-
-    $("#pagination select.column").html("<option value='' selected>Select column</option>");
-
-    for (var i = 0; i < data.rows.length; i++) {
-      var row = data.rows[i];
-
-      var el = $("<option/>").attr("value", row[0]).text(row[0]);
-      $("#pagination select.column").append(el);
-    }
-  });
-}
-
 var rowsEditor = null;
 
 var objectAutocompleter = {
@@ -1138,7 +1114,7 @@ function initRowsEditor() {
   rowsEditor.setHighlightActiveLine(false);
   rowsEditor.renderer.setShowGutter(false);
   rowsEditor.getSession().setMode("ace/mode/pgsql");
-  rowsEditor.getSession().setUseWrapMode(false);
+  rowsEditor.getSession().setUseWrapMode(true);
 
   rowsEditor.commands.addCommand({
     name: "run_rows_query",
@@ -1179,9 +1155,11 @@ function addShortcutTooltips() {
 // Get the latest release from Github API
 function getLatestReleaseInfo(current) {
   try {
-    $.get("https://api.github.com/repos/sosedoff/pgweb/releases/latest", function(release) {
-      if (release.name != current.version) {
-        var message = "Update available. Check out " + release.tag_name + " on <a target='_blank' href='" + release.html_url + "'>Github</a>";
+    $.get("https://api.github.com/repos/blackkriger/pgweb-black/releases/latest", function(release) {
+      // Releases are tagged like "v0.17.4-black"; the running version const is "0.17.4-black".
+      var latest = (release.tag_name || release.name || "").replace(/^v/, "");
+      if (latest && latest != current.version) {
+        var message = "Update available — " + release.tag_name + " on <a target='_blank' href='https://github.com/blackkriger/pgweb-black/releases/latest'>GitHub</a>";
         $(".connection-settings .update").html(message).fadeIn();
       }
     });
@@ -1375,6 +1353,9 @@ function bindTableHeaderMenu() {
         case "copy_value":
           copyToClipboard($(context).text());
           break;
+        case "copy_row":
+          copyRowAsInsert($(context).closest("tr"));
+          break;
         case "set_null":
           setCellNull($(context).children("div"));
           break;
@@ -1386,13 +1367,18 @@ function bindTableHeaderMenu() {
           }
           break;
         case "filter_by_value":
-          var colValue = $(context).text();
-          var colName  = $(context).data("name");
-
-          $("select.column").val(colName);
-          $("select.filter").val("equal");
-          $("#table_filter_value").val(colValue);
-          $("#rows_filter").submit();
+          // The dedicated search form is gone — express the filter in the editable
+          // query bar instead (same result, fully editable afterwards).
+          if ($("#results").data("mode") != "browse" || !rowsEditor) break;
+          var t = $("#results").data("table");
+          var colName = $(context).data("name");
+          var $cellDiv = $(context).children("div");
+          var cond = $cellDiv.children("span.null").length
+            ? '"' + colName + '" IS NULL'
+            : '"' + colName + "\" = '" + String($cellDiv.text()).replace(/'/g, "''") + "'";
+          rowsEditor.setValue("SELECT * FROM " + getQuotedSchemaTableName(t) + " WHERE " + cond);
+          rowsEditor.clearSelection();
+          runRowsQuery();
       }
     }
   });
@@ -1999,6 +1985,24 @@ function openFkTarget(targetTable, targetColumn, value) {
   });
 }
 
+// Build an INSERT statement for a whole row and copy it to the clipboard. Every
+// value is emitted as a quoted literal (NULL kept as NULL) — Postgres casts them
+// to each column's type on INSERT, so int / uuid / jsonb / bool all round-trip.
+function copyRowAsInsert($tr) {
+  var table = $("#results").data("table");
+  if (!table) return;
+  var cols = [], vals = [];
+  $tr.children("td[data-name]").each(function() {
+    var name = $(this).data("name");
+    if (name == null) return;
+    var v = cellValue($(this).children("div"));
+    cols.push('"' + name + '"');
+    vals.push(v === null ? "NULL" : "'" + String(v).replace(/'/g, "''") + "'");
+  });
+  if (!cols.length) return;
+  copyToClipboard("INSERT INTO " + getQuotedSchemaTableName(table) + " (" + cols.join(", ") + ") VALUES (" + vals.join(", ") + ");");
+}
+
 function bindContentModalEvents() {
   var contentModal = document.getElementById("content_modal");
 
@@ -2200,20 +2204,10 @@ $(document).ready(function() {
     loadSchemas();
   });
 
-  $("#rows_filter").on("submit", function(e) {
-    e.preventDefault();
-    $(".current-page").data("page", 1);
-
-    var column = $(this).find("select.column").val();
-    var filter = $(this).find("select.filter").val();
-    var query  = $.trim($(this).find("input").val());
-
-    if (filter && filterOptions[filter].indexOf("DATA") > 0 && query == "") {
-      alert("Please specify filter query");
-      return
-    }
-
-    showTableContent();
+  // Client-side quick filter of the current page (no server round-trip).
+  $("#rows_quickfilter").on("input", applyQuickFilter);
+  $("#rows_quickfilter").on("keydown", function(e) {
+    if (e.keyCode == 27) { $(this).val(""); applyQuickFilter(); }
   });
 
   $(".change-limit").on("click", function() {
