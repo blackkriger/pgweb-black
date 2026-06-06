@@ -2215,6 +2215,20 @@ function diagramZoom(factor, cx, cy) {
   diagramApplyTransform();
 }
 
+// Set an absolute zoom (scale, where 1 = 100%), anchored on the viewport centre.
+function diagramZoomTo(scale) {
+  var vp = document.getElementById("diagram_viewport");
+  var cx = vp.clientWidth / 2, cy = vp.clientHeight / 2;
+  var s0 = diagram.scale;
+  scale = Math.max(0.1, Math.min(5, scale));
+  var px = (cx - diagram.tx) / s0;
+  var py = (cy - diagram.ty) / s0;
+  diagram.scale = scale;
+  diagram.tx = cx - scale * px;
+  diagram.ty = cy - scale * py;
+  diagramApplyTransform();
+}
+
 // ---- JSONB viewer ---------------------------------------------------------
 
 // Parse a cell string into a JSON object/array, or undefined if it isn't one.
@@ -2511,7 +2525,14 @@ $(document).ready(function() {
 
   $("#diagram_zoom_in").on("click",    function() { diagramZoom(1.2); });
   $("#diagram_zoom_out").on("click",   function() { diagramZoom(0.8); });
-  $("#diagram_zoom_reset").on("click", function() { diagramFitView(); });
+  $("#diagram_zoom_reset").on("click", function() {
+    var input = window.prompt("Zoom percentage (leave empty to fit to view):", Math.round(diagram.scale * 100));
+    if (input === null) return;                    // cancelled
+    if (input.trim() === "") { diagramFitView(); return; }  // empty -> fit to view
+    var pct = parseFloat(input);
+    if (!isFinite(pct) || pct <= 0) return;        // ignore invalid input
+    diagramZoomTo(pct / 100);
+  });
 
   $("#diagram_viewport").on("wheel", function(e) {
     e.preventDefault();
