@@ -296,7 +296,12 @@ function getCurrentObject() {
   return currentObject || { name: "", type: "" };
 }
 
+// Anchor index for shift+click range selection of row checkboxes; reset whenever
+// the table is rebuilt so a stale index can't span a different page of rows.
+var rowSelectAnchor = null;
+
 function resetTable() {
+  rowSelectAnchor = null;
   $("#results_header").html("");
   $("#results_body").html("");
   $("#results_view").html("").hide();
@@ -2368,9 +2373,12 @@ function bindContentModalEvents() {
     exportSelectedRows($(this).data("format"));
   });
 
-  // Header "select all": if anything is selected (partial OR full) a click CLEARS everything 
-  $("#results_header").on("click", "input.row-select-all", function(e) {
-    e.preventDefault();
+  // Header "select all": if anything is selected (partial OR full) a click CLEARS
+  // everything, otherwise it ticks all. We let the native toggle run (no
+  // preventDefault) and then overwrite the header state via syncSelectAll —
+  // calling preventDefault here would trigger the checkbox "canceled activation"
+  // revert, which clobbers syncSelectAll and leaves the box stuck in "−".
+  $("#results_header").on("click", "input.row-select-all", function() {
     var on = $("#results_body input.row-select-box:checked").length === 0;
     $("#results_body input.row-select-box").prop("checked", on);
     $("#results_body input.row-select-box").closest("tr").toggleClass("row-checked", on);
@@ -2380,6 +2388,22 @@ function bindContentModalEvents() {
   $("#results_body").on("change", "input.row-select-box", function() {
     $(this).closest("tr").toggleClass("row-checked", this.checked);
     syncSelectAll();
+  });
+
+  // Shift+click ticks every checkbox between the last-clicked one and this one (all set to checked). A plain click just moves the anchor.
+  $("#results_body").on("click", "input.row-select-box", function(e) {
+    var boxes = $("#results_body input.row-select-box").toArray();
+    var idx = boxes.indexOf(this);
+    if (e.shiftKey && rowSelectAnchor != null && rowSelectAnchor < boxes.length && rowSelectAnchor !== idx) {
+      var lo = Math.min(rowSelectAnchor, idx), hi = Math.max(rowSelectAnchor, idx);
+      for (var i = lo; i <= hi; i++) {
+        boxes[i].checked = true;
+        $(boxes[i]).closest("tr").addClass("row-checked");
+      }
+      if (window.getSelection) { var sel = window.getSelection(); if (sel && sel.removeAllRanges) sel.removeAllRanges(); }
+      syncSelectAll();
+    }
+    rowSelectAnchor = idx;
   });
 
   // Esc clears the row selection. Skip when the keystroke comes from a text field (cell editor textarea, query bar, object filter) so it can't steal Esc from the cell edit cancel or a filter reset — those own their own Esc behaviour.
