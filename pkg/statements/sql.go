@@ -26,6 +26,12 @@ var (
 	//go:embed sql/table_constraints.sql
 	TableConstraints string
 
+	//go:embed sql/diagram_columns.sql
+	DiagramColumns string
+
+	//go:embed sql/diagram_edges.sql
+	DiagramEdges string
+
 	//go:embed sql/table_columns_meta.sql
 	TableColumnsMeta string
 

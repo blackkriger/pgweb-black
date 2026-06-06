@@ -521,6 +521,13 @@ function setCurrentTab(id) {
     $("#body").removeClass("with-pagination").removeClass("with-rows-query");
   }
 
+  // The diagram fills the body and is shown via the with-diagram class. Clear it
+  // on every other tab so panels that toggle visibility with addClass (Activity /
+  // Connection) aren't left hidden behind the still-shown diagram.
+  if (id != "table_diagram") {
+    $("#body").removeClass("with-diagram");
+  }
+
   $("#nav ul li.selected").removeClass("selected");
   $("#" + id).addClass("selected");
 
@@ -1865,6 +1872,312 @@ function applyTheme() {
   $("#toggle_theme").text(THEME_LABELS[t]);
 }
 
+// ---- Schema diagram (visual ER viewer) ------------------------------------
+
+var diagram = {
+  schema: null,
+  data: null,
+  pos: {},        // table name -> { x, y }
+  scale: 1,
+  tx: 0, ty: 0,
+  rendered: false
+};
+
+function diagramPosKey() {
+  return "pgweb_diagram_pos:" + ($("#current_database").text() || "db") + ":" + (diagram.schema || "public");
+}
+
+function diagramLoadPositions() {
+  try { var raw = localStorage.getItem(diagramPosKey()); return raw ? JSON.parse(raw) : {}; }
+  catch (e) { return {}; }
+}
+
+function diagramSavePositions() {
+  try { localStorage.setItem(diagramPosKey(), JSON.stringify(diagram.pos)); } catch (e) {}
+}
+
+function showDiagramPanel() {
+  setCurrentTab("table_diagram");
+  $("#input").hide();
+  $("#body").prop("class", "full with-diagram");
+
+  getSchemas(function(schemas) {
+    if (!Array.isArray(schemas)) schemas = [];
+    var $sel = $("#diagram_schema").empty();
+    schemas.forEach(function(s) { $sel.append($("<option>").val(s).text(s)); });
+    var want = diagram.schema || (schemas.indexOf("public") >= 0 ? "public" : schemas[0]);
+    if (want) { $sel.val(want); diagram.schema = want; }
+    loadDiagram();
+  });
+}
+
+function loadDiagram() {
+  var schema = diagram.schema || "public";
+  $("#diagram_status").text("Loading schema…").show();
+  apiCall("get", "/diagram", { schema: schema }, function(data) {
+    if (!data || data.error) {
+      $("#diagram_status").text("Failed to load diagram: " + ((data && data.error) || "unknown error")).show();
+      return;
+    }
+    diagram.data = data;
+    diagram.schema = data.schema || schema;
+    diagram.pos = diagramLoadPositions();
+    renderDiagram();
+  });
+}
+
+function renderDiagram() {
+  var data = diagram.data;
+  var canvas = document.getElementById("diagram_canvas");
+  $(canvas).children(".diagram-table").remove();
+
+  if (!data || !data.tables || !data.tables.length) {
+    while (document.getElementById("diagram_edges").firstChild) {
+      document.getElementById("diagram_edges").removeChild(document.getElementById("diagram_edges").firstChild);
+    }
+    $("#diagram_status").text("No tables in this schema.").show();
+    return;
+  }
+  $("#diagram_status").hide();
+
+  data.tables.forEach(function(t) {
+    var card = document.createElement("div");
+    card.className = "diagram-table";
+    card.setAttribute("data-table", t.name);
+
+    var head = document.createElement("div");
+    head.className = "diagram-table__head";
+    head.textContent = t.name;
+    card.appendChild(head);
+
+    var cols = document.createElement("div");
+    cols.className = "diagram-table__cols";
+    t.columns.forEach(function(col) {
+      var row = document.createElement("div");
+      row.className = "diagram-table__col";
+      row.setAttribute("data-col", col.name);
+
+      var key = document.createElement("span");
+      key.className = "diagram-col__key";
+      if (col.is_primary) key.innerHTML += '<i class="fa fa-key diagram-col__pk" title="Primary key"></i>';
+      if (col.is_foreign) key.innerHTML += '<i class="fa fa-link diagram-col__fk" title="Foreign key"></i>';
+      row.appendChild(key);
+
+      var nm = document.createElement("span");
+      nm.className = "diagram-col__name";
+      nm.textContent = col.name;
+      row.appendChild(nm);
+
+      var ty = document.createElement("span");
+      ty.className = "diagram-col__type";
+      ty.textContent = col.type;
+      row.appendChild(ty);
+
+      cols.appendChild(row);
+    });
+    card.appendChild(cols);
+    canvas.appendChild(card);
+  });
+
+  diagramLayout();
+  diagramApplyPositions();
+  diagramFitView();
+  diagramDrawEdges();
+  diagram.rendered = true;
+}
+
+// Deterministic layout: each connected component is laid out left-to-right by BFS level, then components are shelf-packed into wrapping bands. Positions are applied only to tables that don't already have a (saved) one, so manual drags and saved layouts survive a re-render; "Auto layout" clears pos to force all.
+function diagramLayout() {
+  var data = diagram.data;
+  var GAP_X = 60, GAP_Y = 34, COMP_GAP_X = 80, COMP_GAP_Y = 60, MAX_ROW = 1600;
+
+  var size = {};
+  $("#diagram_canvas .diagram-table").each(function() {
+    size[this.getAttribute("data-table")] = { w: this.offsetWidth || 200, h: this.offsetHeight || 120 };
+  });
+
+  var adj = {};
+  data.tables.forEach(function(t) { adj[t.name] = []; });
+  data.edges.forEach(function(e) {
+    if (!(e.source_table in size) || !(e.target_table in size)) return;
+    if (e.source_table === e.target_table) return;
+    adj[e.source_table].push(e.target_table);
+    adj[e.target_table].push(e.source_table);
+  });
+
+  var degree = {};
+  data.tables.forEach(function(t) { degree[t.name] = adj[t.name].length; });
+  var order = data.tables.map(function(t) { return t.name; })
+    .sort(function(a, b) { return degree[b] - degree[a]; });
+
+  // Lay out each component relative to its own origin; collect its bounding box.
+  var visited = {};
+  var comps = [];
+  order.forEach(function(start) {
+    if (visited[start]) return;
+    var columns = [];
+    var queue = [{ name: start, level: 0 }];
+    visited[start] = true;
+    while (queue.length) {
+      var cur = queue.shift();
+      (columns[cur.level] = columns[cur.level] || []).push(cur.name);
+      adj[cur.name].forEach(function(nb) {
+        if (!visited[nb]) { visited[nb] = true; queue.push({ name: nb, level: cur.level + 1 }); }
+      });
+    }
+    var rel = {}, x = 0, compH = 0;
+    for (var lvl = 0; lvl < columns.length; lvl++) {
+      var names = columns[lvl] || [], maxW = 0, y = 0;
+      names.forEach(function(n) { maxW = Math.max(maxW, size[n].w); });
+      names.forEach(function(n) { rel[n] = { x: x, y: y }; y += size[n].h + GAP_Y; });
+      compH = Math.max(compH, y - GAP_Y);
+      x += maxW + GAP_X;
+    }
+    comps.push({ rel: rel, w: Math.max(0, x - GAP_X), h: compH });
+  });
+
+  // Shelf-pack components into bands, wrapping when a band gets too wide.
+  var computed = {};
+  var bandX = 40, bandY = 40, bandH = 0;
+  comps.forEach(function(c) {
+    if (bandX > 40 && bandX + c.w > MAX_ROW) { bandX = 40; bandY += bandH + COMP_GAP_Y; bandH = 0; }
+    for (var n in c.rel) computed[n] = { x: bandX + c.rel[n].x, y: bandY + c.rel[n].y };
+    bandX += c.w + COMP_GAP_X;
+    bandH = Math.max(bandH, c.h);
+  });
+
+  data.tables.forEach(function(t) {
+    if (!diagram.pos[t.name] && computed[t.name]) diagram.pos[t.name] = computed[t.name];
+  });
+}
+
+function diagramApplyPositions() {
+  $("#diagram_canvas .diagram-table").each(function() {
+    var p = diagram.pos[this.getAttribute("data-table")];
+    if (p) { this.style.left = p.x + "px"; this.style.top = p.y + "px"; }
+  });
+  diagramResizeCanvas();
+}
+
+function diagramResizeCanvas() {
+  var maxR = 0, maxB = 0;
+  $("#diagram_canvas .diagram-table").each(function() {
+    var p = diagram.pos[this.getAttribute("data-table")];
+    if (!p) return;
+    maxR = Math.max(maxR, p.x + this.offsetWidth);
+    maxB = Math.max(maxB, p.y + this.offsetHeight);
+  });
+  var w = maxR + 120, h = maxB + 120;
+  var canvas = document.getElementById("diagram_canvas");
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  var svg = document.getElementById("diagram_edges");
+  svg.setAttribute("width", w);
+  svg.setAttribute("height", h);
+  svg.setAttribute("viewBox", "0 0 " + w + " " + h);
+}
+
+function diagramColEl(card, colName) {
+  var els = card.querySelectorAll(".diagram-table__col");
+  for (var i = 0; i < els.length; i++) {
+    if (els[i].getAttribute("data-col") === colName) return els[i];
+  }
+  return null;
+}
+
+function diagramDrawEdges() {
+  var svg = document.getElementById("diagram_edges");
+  while (svg.firstChild) svg.removeChild(svg.firstChild);
+  var data = diagram.data;
+  if (!data) return;
+
+  var cardEls = {};
+  $("#diagram_canvas .diagram-table").each(function() { cardEls[this.getAttribute("data-table")] = this; });
+
+  var NS = "http://www.w3.org/2000/svg";
+
+  data.edges.forEach(function(e) {
+    var s = cardEls[e.source_table], t = cardEls[e.target_table];
+    if (!s || !t) return;
+    var sp = diagram.pos[e.source_table], tp = diagram.pos[e.target_table];
+    if (!sp || !tp) return;
+
+    var sCol = diagramColEl(s, e.source_column);
+    var tCol = diagramColEl(t, e.target_column);
+    var sW = s.offsetWidth, sH = s.offsetHeight, tW = t.offsetWidth, tH = t.offsetHeight;
+
+    var sy = sp.y + (sCol ? sCol.offsetTop + sCol.offsetHeight / 2 : sH / 2);
+    var ty = tp.y + (tCol ? tCol.offsetTop + tCol.offsetHeight / 2 : tH / 2);
+    var sCenter = sp.x + sW / 2, tCenter = tp.x + tW / 2;
+
+    var sRight = tCenter >= sCenter;
+    var tRight = sCenter > tCenter;
+    var sx = sRight ? sp.x + sW : sp.x;
+    var tx = tRight ? tp.x + tW : tp.x;
+
+    var selfRef = (s === t);
+    if (selfRef) {
+      sx = sp.x + sW; tx = sp.x + sW;
+      sy = sp.y + (sCol ? sCol.offsetTop + sCol.offsetHeight / 2 : sH / 3);
+      ty = sp.y + (tCol ? tCol.offsetTop + tCol.offsetHeight / 2 : 2 * sH / 3);
+    }
+
+    var dx = Math.max(40, Math.min(140, Math.abs(tx - sx) / 2));
+    var c1x = selfRef ? sx + 70 : sx + (sRight ? dx : -dx);
+    var c2x = selfRef ? tx + 70 : tx + (tRight ? dx : -dx);
+
+    var d = "M " + sx + " " + sy + " C " + c1x + " " + sy + " " + c2x + " " + ty + " " + tx + " " + ty;
+    var path = document.createElementNS(NS, "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", "diagram-edge");
+    svg.appendChild(path);
+
+    [[sx, sy], [tx, ty]].forEach(function(pt) {
+      var dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", pt[0]);
+      dot.setAttribute("cy", pt[1]);
+      dot.setAttribute("r", 3);
+      dot.setAttribute("class", "diagram-edge-dot");
+      svg.appendChild(dot);
+    });
+  });
+}
+
+function diagramApplyTransform() {
+  var canvas = document.getElementById("diagram_canvas");
+  canvas.style.transform = "translate(" + diagram.tx + "px," + diagram.ty + "px) scale(" + diagram.scale + ")";
+  var vp = document.getElementById("diagram_viewport");
+  vp.style.backgroundPosition = diagram.tx + "px " + diagram.ty + "px";
+  vp.style.backgroundSize = (24 * diagram.scale) + "px " + (24 * diagram.scale) + "px";
+  $("#diagram_zoom_reset").text(Math.round(diagram.scale * 100) + "%");
+}
+
+function diagramFitView() {
+  var vp = document.getElementById("diagram_viewport");
+  var canvas = document.getElementById("diagram_canvas");
+  var vw = vp.clientWidth, vh = vp.clientHeight;
+  var cw = canvas.offsetWidth, ch = canvas.offsetHeight;
+  if (!cw || !ch) return;
+  var scale = Math.min(1, (vw - 60) / cw, (vh - 60) / ch);
+  diagram.scale = Math.max(0.2, scale);
+  diagram.tx = Math.max(20, (vw - cw * diagram.scale) / 2);
+  diagram.ty = 24;
+  diagramApplyTransform();
+}
+
+function diagramZoom(factor, cx, cy) {
+  var vp = document.getElementById("diagram_viewport");
+  if (cx == null) { cx = vp.clientWidth / 2; cy = vp.clientHeight / 2; }
+  var s0 = diagram.scale;
+  var s1 = Math.max(0.15, Math.min(2.5, s0 * factor));
+  var px = (cx - diagram.tx) / s0;
+  var py = (cy - diagram.ty) / s0;
+  diagram.scale = s1;
+  diagram.tx = cx - s1 * px;
+  diagram.ty = cy - s1 * py;
+  diagramApplyTransform();
+}
+
 // ---- JSONB viewer ---------------------------------------------------------
 
 // Parse a cell string into a JSON object/array, or undefined if it isn't one.
@@ -2097,10 +2410,103 @@ $(document).ready(function() {
   $("#table_structure").on("click",   function() { showTableStructure();   });
   $("#table_indexes").on("click",     function() { showTableIndexes();     });
   $("#table_constraints").on("click", function() { showTableConstraints(); });
+  $("#table_diagram").on("click",     function() { showDiagramPanel();     });
   $("#table_history").on("click",     function() { showQueryHistory();     });
   $("#table_query").on("click",       function() { showQueryPanel();       });
   $("#table_connection").on("click",  function() { showConnectionPanel();  });
   $("#table_activity").on("click",    function() { showActivityPanel();    });
+
+  // ---- Schema diagram interactions ----
+  $("#diagram_schema").on("change", function() {
+    diagram.schema = $(this).val();
+    loadDiagram();
+  });
+
+  $("#diagram_filter").on("input", function() {
+    var q = $(this).val().trim().toLowerCase();
+    var $cards = $("#diagram_canvas .diagram-table");
+    if (!q) { $cards.removeClass("diagram-dim"); return; }
+    $cards.each(function() {
+      var hit = this.getAttribute("data-table").toLowerCase().indexOf(q) >= 0;
+      $(this).toggleClass("diagram-dim", !hit);
+    });
+  });
+
+  $("#diagram_relayout").on("click", function() {
+    diagram.pos = {};
+    diagramLayout();
+    diagramApplyPositions();
+    diagramFitView();
+    diagramDrawEdges();
+    diagramSavePositions();
+  });
+
+  $("#diagram_zoom_in").on("click",    function() { diagramZoom(1.2); });
+  $("#diagram_zoom_out").on("click",   function() { diagramZoom(0.8); });
+  $("#diagram_zoom_reset").on("click", function() { diagramFitView(); });
+
+  $("#diagram_viewport").on("wheel", function(e) {
+    e.preventDefault();
+    var rect = this.getBoundingClientRect();
+    var factor = (e.originalEvent.deltaY < 0) ? 1.1 : 0.9;
+    diagramZoom(factor, e.originalEvent.clientX - rect.left, e.originalEvent.clientY - rect.top);
+  });
+
+  // Pan the canvas by dragging empty viewport space; drag a card by its head.
+  var diagPan = null, diagDrag = null;
+
+  $("#diagram_viewport").on("mousedown", function(e) {
+    if ($(e.target).closest(".diagram-table").length) return;
+    diagPan = { x: e.clientX, y: e.clientY, tx: diagram.tx, ty: diagram.ty };
+    $("#diagram_viewport").addClass("panning");
+    e.preventDefault();
+  });
+
+  $("#diagram_canvas").on("mousedown", ".diagram-table__head", function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+    var card = $(this).closest(".diagram-table")[0];
+    var name = card.getAttribute("data-table");
+    var p = diagram.pos[name] || { x: 0, y: 0 };
+    diagDrag = { name: name, card: card, sx: e.clientX, sy: e.clientY, x0: p.x, y0: p.y };
+    card.classList.add("dragging");
+  });
+
+  $("#diagram_canvas").on("dblclick", ".diagram-table__head", function(e) {
+    e.preventDefault();
+    var name = $(this).closest(".diagram-table").attr("data-table");
+    if (!name) return;
+    currentObject = { name: (diagram.schema || "public") + "." + name, type: "table" };
+    sessionStorage.setItem("tab", "table_content");
+    showTableInfo();
+    showTableContent();
+  });
+
+  $(document).on("mousemove", function(e) {
+    if (diagPan) {
+      diagram.tx = diagPan.tx + (e.clientX - diagPan.x);
+      diagram.ty = diagPan.ty + (e.clientY - diagPan.y);
+      diagramApplyTransform();
+    } else if (diagDrag) {
+      var nx = diagDrag.x0 + (e.clientX - diagDrag.sx) / diagram.scale;
+      var ny = diagDrag.y0 + (e.clientY - diagDrag.sy) / diagram.scale;
+      diagram.pos[diagDrag.name] = { x: nx, y: ny };
+      diagDrag.card.style.left = nx + "px";
+      diagDrag.card.style.top = ny + "px";
+      diagramDrawEdges();
+    }
+  });
+
+  $(document).on("mouseup", function() {
+    if (diagPan) { diagPan = null; $("#diagram_viewport").removeClass("panning"); }
+    if (diagDrag) {
+      diagDrag.card.classList.remove("dragging");
+      diagDrag = null;
+      diagramResizeCanvas();
+      diagramDrawEdges();
+      diagramSavePositions();
+    }
+  });
 
   $("#run").on("click", function() {
     runQuery();

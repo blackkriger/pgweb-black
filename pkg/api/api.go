@@ -512,6 +512,12 @@ func GetTableConstraints(c *gin.Context) {
 	serveResult(c, res, err)
 }
 
+// GetSchemaDiagram renders the schema as a graph of tables + foreign-key edges
+func GetSchemaDiagram(c *gin.Context) {
+	res, err := DB(c).SchemaDiagram(c.Request.FormValue("schema"))
+	serveResult(c, res, err)
+}
+
 // UpdateTableRow updates a single cell of a table row, located by primary key
 func UpdateTableRow(c *gin.Context) {
 	column := c.Request.FormValue("column")

@@ -31,6 +31,7 @@
         <li id="table_query" class="selected">Query</li>
         <li id="table_history">History</li>
         <li id="table_activity">Activity</li>
+        <li id="table_diagram">Diagram</li>
         <li id="table_connection">Connection</li>
       </ul>
 
@@ -133,6 +134,29 @@
         </div>
         <div class="current-page" data-page="1" data-pages="1">
           <span id="total_records"></span> rows
+        </div>
+      </div>
+      <div id="diagram">
+        <div class="diagram-toolbar">
+          <div class="diagram-toolbar__left">
+            <span class="diagram-toolbar__label">Schema</span>
+            <select id="diagram_schema"></select>
+            <input type="text" id="diagram_filter" placeholder="Find table" autocomplete="off" />
+          </div>
+          <div class="diagram-toolbar__right">
+            <button type="button" class="btn btn-default btn-sm" id="diagram_relayout" title="Auto-arrange tables">Auto layout</button>
+            <div class="btn-group diagram-zoom">
+              <button type="button" class="btn btn-default btn-sm" id="diagram_zoom_out" title="Zoom out">&#8722;</button>
+              <button type="button" class="btn btn-default btn-sm" id="diagram_zoom_reset" title="Fit to view">100%</button>
+              <button type="button" class="btn btn-default btn-sm" id="diagram_zoom_in" title="Zoom in">+</button>
+            </div>
+          </div>
+        </div>
+        <div id="diagram_viewport">
+          <div id="diagram_canvas">
+            <svg id="diagram_edges" xmlns="http://www.w3.org/2000/svg"></svg>
+          </div>
+          <div id="diagram_status" class="diagram-status"></div>
         </div>
       </div>
     </div>
