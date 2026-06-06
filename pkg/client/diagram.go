@@ -8,16 +8,24 @@ import (
 
 // DiagramColumn is a single column rendered inside a table card on the schema diagram.
 type DiagramColumn struct {
-	Name      string `json:"name" db:"name"`
-	Type      string `json:"type" db:"type"`
-	IsPrimary bool   `json:"is_primary" db:"is_primary"`
-	IsForeign bool   `json:"is_foreign" db:"is_foreign"`
+	Name        string `json:"name" db:"name"`
+	Type        string `json:"type" db:"type"`
+	IsPrimary   bool   `json:"is_primary" db:"is_primary"`
+	IsForeign   bool   `json:"is_foreign" db:"is_foreign"`
+	IsIndexed   bool   `json:"is_indexed" db:"is_indexed"`
+	IsUnique    bool   `json:"is_unique" db:"is_unique"`
+	IsNotNull   bool   `json:"is_not_null" db:"is_not_null"`
+	IsIdentity  bool   `json:"is_identity" db:"is_identity"`
+	IsGenerated bool   `json:"is_generated" db:"is_generated"`
+	Default     string `json:"default" db:"default_expr"`
 }
 
-// DiagramTable is a table card: its name plus the ordered list of its columns.
+// DiagramTable is a table card: its name, estimated row count + on-disk size, and the ordered list of its columns.
 type DiagramTable struct {
-	Name    string          `json:"name"`
-	Columns []DiagramColumn `json:"columns"`
+	Name      string          `json:"name"`
+	EstRows   int64           `json:"est_rows"`
+	SizeBytes int64           `json:"size_bytes"`
+	Columns   []DiagramColumn `json:"columns"`
 }
 
 // DiagramEdge is a single foreign-key relationship (one column pair) between two tables.
@@ -38,11 +46,24 @@ type SchemaDiagram struct {
 
 // diagramColumnRow is the flat scan target for the columns query before grouping by table.
 type diagramColumnRow struct {
-	TableName string `db:"table_name"`
+	TableName   string `db:"table_name"`
+	Name        string `db:"name"`
+	Type        string `db:"type"`
+	IsPrimary   bool   `db:"is_primary"`
+	IsForeign   bool   `db:"is_foreign"`
+	IsIndexed   bool   `db:"is_indexed"`
+	IsUnique    bool   `db:"is_unique"`
+	IsNotNull   bool   `db:"is_not_null"`
+	IsIdentity  bool   `db:"is_identity"`
+	IsGenerated bool   `db:"is_generated"`
+	Default     string `db:"default_expr"`
+}
+
+// diagramTableStat carries the per-table estimated row count + on-disk size.
+type diagramTableStat struct {
 	Name      string `db:"name"`
-	Type      string `db:"type"`
-	IsPrimary bool   `db:"is_primary"`
-	IsForeign bool   `db:"is_foreign"`
+	EstRows   int64  `db:"est_rows"`
+	SizeBytes int64  `db:"size_bytes"`
 }
 
 // SchemaDiagram returns every base table in the schema with its columns plus all foreign-key edges, ready to render as an ER diagram. Read-only catalog SELECTs.
@@ -74,6 +95,15 @@ func (client *Client) SchemaDiagram(schema string) (*SchemaDiagram, error) {
 		edges = []DiagramEdge{}
 	}
 
+	var statRows []diagramTableStat
+	if err := client.db.SelectContext(ctx, &statRows, statements.DiagramTables, schema); err != nil {
+		return nil, err
+	}
+	stats := map[string]diagramTableStat{}
+	for _, s := range statRows {
+		stats[s.Name] = s
+	}
+
 	// Group columns into table cards, preserving the query's table + column order.
 	tables := []DiagramTable{}
 	index := map[string]int{}
@@ -82,13 +112,24 @@ func (client *Client) SchemaDiagram(schema string) (*SchemaDiagram, error) {
 		if !ok {
 			i = len(tables)
 			index[r.TableName] = i
-			tables = append(tables, DiagramTable{Name: r.TableName, Columns: []DiagramColumn{}})
+			t := DiagramTable{Name: r.TableName, Columns: []DiagramColumn{}}
+			if s, ok := stats[r.TableName]; ok {
+				t.EstRows = s.EstRows
+				t.SizeBytes = s.SizeBytes
+			}
+			tables = append(tables, t)
 		}
 		tables[i].Columns = append(tables[i].Columns, DiagramColumn{
-			Name:      r.Name,
-			Type:      r.Type,
-			IsPrimary: r.IsPrimary,
-			IsForeign: r.IsForeign,
+			Name:        r.Name,
+			Type:        r.Type,
+			IsPrimary:   r.IsPrimary,
+			IsForeign:   r.IsForeign,
+			IsIndexed:   r.IsIndexed,
+			IsUnique:    r.IsUnique,
+			IsNotNull:   r.IsNotNull,
+			IsIdentity:  r.IsIdentity,
+			IsGenerated: r.IsGenerated,
+			Default:     r.Default,
 		})
 	}
 

@@ -231,6 +231,11 @@ body.office98 .diagram-col__name { color: #000; }
 body.office98 .diagram-col__type { color: #404040; }
 body.office98 .diagram-col__pk { color: #808000; }
 body.office98 .diagram-col__fk { color: var(--navy); }
+body.office98 .diagram-col__idx { color: var(--sh); }
+body.office98 .diagram-col__uniq { color: #008080; }
+body.office98 .diagram-col__flag { color: var(--sh); }
 body.office98 .diagram-edge { stroke: #ffffff; stroke-opacity: 0.75; }
 body.office98 .diagram-edge-dot { fill: #ffffff; }
+body.office98 .diagram-edge--hot { stroke: #ffe089; stroke-opacity: 1; }
+body.office98 .diagram-edge-dot--hot { fill: #ffe089; }
 body.office98 .diagram-status { background: var(--face); color: #000; border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi); border-radius: 0; }

@@ -1108,23 +1108,36 @@
   position: absolute; z-index: 2; min-width: 190px; max-width: 340px;
   background: #fff; border: 1px solid #d9d9d9; border-radius: 6px;
   box-shadow: 0 2px 6px rgba(0,0,0,0.10); font-size: 12.5px; overflow: hidden; user-select: none;
+  cursor: pointer; /* clicking the body focuses the table + its relations */
 }
 .diagram-table.dragging { box-shadow: 0 6px 18px rgba(0,0,0,0.22); z-index: 5; }
 .diagram-table.diagram-dim { opacity: 0.25; }
 .diagram-table__head {
-  background: linear-gradient(180deg, #8cc45c 0%, #7eb54e 100%); color: #fff; font-weight: 600;
-  padding: 6px 10px; cursor: move; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  background: linear-gradient(180deg, #8cc45c 0%, #7eb54e 100%); color: #fff;
+  padding: 6px 10px; cursor: move; display: flex; flex-direction: row; align-items: center; gap: 10px;
 }
+.diagram-table__name { font-weight: 600; flex: 1 1 auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.diagram-table__meta { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
+.diagram-table__rows, .diagram-table__size { font-size: 10px; font-weight: 400; opacity: 0.82; white-space: nowrap; }
 .diagram-table__cols { background: #fff; }
 .diagram-table__col { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-top: 1px solid #f0f0f0; white-space: nowrap; }
-.diagram-col__key { flex: 0 0 auto; width: 26px; display: inline-flex; gap: 3px; }
+.diagram-col__key { flex: 0 0 auto; width: 42px; display: inline-flex; align-items: center; gap: 3px; }
 .diagram-col__pk { color: #d4a017; }
 .diagram-col__fk { color: #999; }
+.diagram-col__idx { color: #b0b0b0; }
+.diagram-col__uniq { color: #2aa7a0; }
+.diagram-col__flag { color: #999; }
+.diagram-col__nullable { opacity: 0.55; margin-left: 1px; }
 .diagram-col__name { flex: 1 1 auto; color: #333; overflow: hidden; text-overflow: ellipsis; }
 .diagram-col__type { flex: 0 0 auto; color: #aaa; font-size: 11px; margin-left: 10px; }
 
 .diagram-edge { fill: none; stroke: #b9b9b9; stroke-width: 1.5; stroke-dasharray: 5 4; }
 .diagram-edge-dot { fill: #8a8a8a; }
+/* Click-to-focus: edges touching the focused table go solid + accented, the rest fade. */
+.diagram-edge--hot { stroke: #4a90d9; stroke-width: 2; stroke-dasharray: none; }
+.diagram-edge--cold { opacity: 0.1; }
+.diagram-edge-dot--hot { fill: #4a90d9; }
+.diagram-edge-dot--cold { opacity: 0.1; }
 
 .diagram-status { position: absolute; left: 50%; top: 40px; transform: translateX(-50%); background: rgba(255,255,255,0.95); border: 1px solid #e0e0e0; border-radius: 4px; padding: 8px 14px; font-size: 13px; color: #666; z-index: 4; }
 

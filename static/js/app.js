@@ -1963,8 +1963,38 @@ function loadDiagram() {
   });
 }
 
+// Human-readable byte size for a table card (1 KB = 1024 B).
+function diagramFmtBytes(n) {
+  if (typeof n !== "number" || n < 0) return "";
+  var units = ["B", "KB", "MB", "GB", "TB"], i = 0, v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (i === 0 ? v : parseFloat(v.toFixed(1))) + " " + units[i];
+}
+
+// Estimated row count for a table card head — the planner's reltuples (hence ≈); "" when unknown (-1, never analyzed).
+function diagramRowsLabel(t) {
+  if (typeof t.est_rows === "number" && t.est_rows >= 0) {
+    return "≈ " + t.est_rows.toLocaleString() + " rows";
+  }
+  return "";
+}
+
+// On-disk size label for a table card head ("" when unavailable).
+function diagramSizeLabel(t) {
+  return diagramFmtBytes(t.size_bytes);
+}
+
+// A Font Awesome flag icon (default / auto-increment / generated) for the column's left icon cluster, styled like the PK/FK/index icons; detail goes in the tooltip.
+function diagramFlag(icon, cls, title) {
+  var el = document.createElement("i");
+  el.className = "fa " + icon + " diagram-col__flag " + cls;
+  el.title = title;
+  return el;
+}
+
 function renderDiagram() {
   var data = diagram.data;
+  diagram.focus = null;
   var canvas = document.getElementById("diagram_canvas");
   $(canvas).children(".diagram-table").remove();
 
@@ -1984,7 +2014,29 @@ function renderDiagram() {
 
     var head = document.createElement("div");
     head.className = "diagram-table__head";
-    head.textContent = t.name;
+    var hname = document.createElement("span");
+    hname.className = "diagram-table__name";
+    hname.textContent = t.name;
+    head.appendChild(hname);
+    var rowsLabel = diagramRowsLabel(t);
+    var sizeLabel = diagramSizeLabel(t);
+    if (rowsLabel || sizeLabel) {
+      var metaEl = document.createElement("div");
+      metaEl.className = "diagram-table__meta";
+      if (rowsLabel) {
+        var rowsEl = document.createElement("span");
+        rowsEl.className = "diagram-table__rows";
+        rowsEl.textContent = rowsLabel;
+        metaEl.appendChild(rowsEl);
+      }
+      if (sizeLabel) {
+        var sizeEl = document.createElement("span");
+        sizeEl.className = "diagram-table__size";
+        sizeEl.textContent = sizeLabel;
+        metaEl.appendChild(sizeEl);
+      }
+      head.appendChild(metaEl);
+    }
     card.appendChild(head);
 
     var cols = document.createElement("div");
@@ -1998,6 +2050,21 @@ function renderDiagram() {
       key.className = "diagram-col__key";
       if (col.is_primary) key.innerHTML += '<i class="fa fa-key diagram-col__pk" title="Primary key"></i>';
       if (col.is_foreign) key.innerHTML += '<i class="fa fa-link diagram-col__fk" title="Foreign key"></i>';
+      // Index marker — skip on PK (always indexed, already shown by the key icon).
+      if (col.is_indexed && !col.is_primary) {
+        var idxCls = col.is_unique ? "diagram-col__uniq" : "diagram-col__idx";
+        var idxTip = col.is_unique ? "Unique index" : "Indexed";
+        key.innerHTML += '<i class="fa fa-search ' + idxCls + '" title="' + idxTip + '"></i>';
+      }
+      // Default / auto-increment / generated (mutually exclusive). Serial counts as auto-increment (its default is nextval(...)).
+      var isAuto = col.is_identity || (col.default && col.default.indexOf("nextval(") === 0);
+      if (isAuto) {
+        key.appendChild(diagramFlag("fa-sort-numeric-asc", "diagram-col__auto", "Auto-increment"));
+      } else if (col.is_generated) {
+        key.appendChild(diagramFlag("fa-magic", "diagram-col__gen", "Generated" + (col.default ? ": " + col.default : "")));
+      } else if (col.default) {
+        key.appendChild(diagramFlag("fa-flag", "diagram-col__def", "Default: " + col.default));
+      }
       row.appendChild(key);
 
       var nm = document.createElement("span");
@@ -2008,6 +2075,13 @@ function renderDiagram() {
       var ty = document.createElement("span");
       ty.className = "diagram-col__type";
       ty.textContent = col.type;
+      if (!col.is_not_null) {
+        var nul = document.createElement("span");
+        nul.className = "diagram-col__nullable";
+        nul.textContent = "?";
+        nul.title = "Nullable";
+        ty.appendChild(nul);
+      }
       row.appendChild(ty);
 
       cols.appendChild(row);
@@ -2139,6 +2213,10 @@ function diagramDrawEdges() {
     var sp = diagram.pos[e.source_table], tp = diagram.pos[e.target_table];
     if (!sp || !tp) return;
 
+    // When a table is focused (clicked), edges touching it are "hot", the rest "cold".
+    var hot = !diagram.focus || e.source_table === diagram.focus || e.target_table === diagram.focus;
+    var edgeMod = diagram.focus ? (hot ? " diagram-edge--hot" : " diagram-edge--cold") : "";
+
     var sCol = diagramColEl(s, e.source_column);
     var tCol = diagramColEl(t, e.target_column);
     var sW = s.offsetWidth, sH = s.offsetHeight, tW = t.offsetWidth, tH = t.offsetHeight;
@@ -2166,7 +2244,7 @@ function diagramDrawEdges() {
     var d = "M " + sx + " " + sy + " C " + c1x + " " + sy + " " + c2x + " " + ty + " " + tx + " " + ty;
     var path = document.createElementNS(NS, "path");
     path.setAttribute("d", d);
-    path.setAttribute("class", "diagram-edge");
+    path.setAttribute("class", "diagram-edge" + edgeMod);
     svg.appendChild(path);
 
     [[sx, sy], [tx, ty]].forEach(function(pt) {
@@ -2174,10 +2252,32 @@ function diagramDrawEdges() {
       dot.setAttribute("cx", pt[0]);
       dot.setAttribute("cy", pt[1]);
       dot.setAttribute("r", 3);
-      dot.setAttribute("class", "diagram-edge-dot");
+      dot.setAttribute("class", "diagram-edge-dot" + (diagram.focus ? (hot ? " diagram-edge-dot--hot" : " diagram-edge-dot--cold") : ""));
       svg.appendChild(dot);
     });
   });
+}
+
+// Click-to-focus: spotlight a table + its FK-connected neighbours, dim the rest, and recolour edges (hot/cold). Passing null (or re-clicking the same table) clears the focus.
+function diagramHighlight(name) {
+  var $cards = $("#diagram_canvas .diagram-table");
+  if (!name || diagram.focus === name) {
+    diagram.focus = null;
+    $cards.removeClass("diagram-dim");
+    diagramDrawEdges();
+    return;
+  }
+  diagram.focus = name;
+  var neighbors = {};
+  neighbors[name] = true;
+  ((diagram.data && diagram.data.edges) || []).forEach(function(e) {
+    if (e.source_table === name) neighbors[e.target_table] = true;
+    if (e.target_table === name) neighbors[e.source_table] = true;
+  });
+  $cards.each(function() {
+    $(this).toggleClass("diagram-dim", !neighbors[this.getAttribute("data-table")]);
+  });
+  diagramDrawEdges();
 }
 
 function diagramApplyTransform() {
@@ -2542,11 +2642,13 @@ $(document).ready(function() {
   });
 
   // Pan the canvas by dragging empty viewport space; drag a card by its head.
-  var diagPan = null, diagDrag = null;
+  // diagDragged / diagPanned track whether the gesture actually moved, so the trailing click doesn't fire the click-to-focus / clear-focus action.
+  var diagPan = null, diagDrag = null, diagDragged = false, diagPanned = false;
 
   $("#diagram_viewport").on("mousedown", function(e) {
     if ($(e.target).closest(".diagram-table").length) return;
     diagPan = { x: e.clientX, y: e.clientY, tx: diagram.tx, ty: diagram.ty };
+    diagPanned = false;
     $("#diagram_viewport").addClass("panning");
     e.preventDefault();
   });
@@ -2558,6 +2660,7 @@ $(document).ready(function() {
     var name = card.getAttribute("data-table");
     var p = diagram.pos[name] || { x: 0, y: 0 };
     diagDrag = { name: name, card: card, sx: e.clientX, sy: e.clientY, x0: p.x, y0: p.y };
+    diagDragged = false;
     card.classList.add("dragging");
   });
 
@@ -2573,10 +2676,12 @@ $(document).ready(function() {
 
   $(document).on("mousemove", function(e) {
     if (diagPan) {
+      diagPanned = true;
       diagram.tx = diagPan.tx + (e.clientX - diagPan.x);
       diagram.ty = diagPan.ty + (e.clientY - diagPan.y);
       diagramApplyTransform();
     } else if (diagDrag) {
+      diagDragged = true;
       var nx = diagDrag.x0 + (e.clientX - diagDrag.sx) / diagram.scale;
       var ny = diagDrag.y0 + (e.clientY - diagDrag.sy) / diagram.scale;
       diagram.pos[diagDrag.name] = { x: nx, y: ny };
@@ -2595,6 +2700,19 @@ $(document).ready(function() {
       diagramDrawEdges();
       diagramSavePositions();
     }
+  });
+
+  // Click a table to spotlight it + its FK neighbours; click empty space to clear.
+  // A gesture that moved (drag/pan) suppresses the trailing click.
+  $("#diagram_canvas").on("click", ".diagram-table", function() {
+    if (diagDragged) { diagDragged = false; return; }
+    diagramHighlight(this.getAttribute("data-table"));
+  });
+
+  $("#diagram_viewport").on("click", function(e) {
+    if (diagPanned) { diagPanned = false; return; }
+    if ($(e.target).closest(".diagram-table").length) return;
+    diagramHighlight(null);
   });
 
   $("#run").on("click", function() {

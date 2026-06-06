@@ -32,6 +32,9 @@ var (
 	//go:embed sql/diagram_edges.sql
 	DiagramEdges string
 
+	//go:embed sql/diagram_tables.sql
+	DiagramTables string
+
 	//go:embed sql/table_columns_meta.sql
 	TableColumnsMeta string
 

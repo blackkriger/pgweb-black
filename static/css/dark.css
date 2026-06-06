@@ -195,8 +195,13 @@ body.dark .diagram-col__name { color: var(--text); }
 body.dark .diagram-col__type { color: var(--text-dim); }
 body.dark .diagram-col__pk { color: #e0c050; }
 body.dark .diagram-col__fk { color: var(--accent-2); }
+body.dark .diagram-col__idx { color: var(--text-dim); }
+body.dark .diagram-col__uniq { color: #5bc0b8; }
+body.dark .diagram-col__flag { color: var(--text-dim); }
 body.dark .diagram-edge { stroke: #6b6480; }
 body.dark .diagram-edge-dot { fill: #9d93b8; }
+body.dark .diagram-edge--hot { stroke: var(--accent-2); }
+body.dark .diagram-edge-dot--hot { fill: var(--accent-2); }
 body.dark .diagram-status { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
 
 /* placeholders + scrollbars */
