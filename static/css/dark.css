@@ -158,6 +158,8 @@ body.dark .connection-group-switch .btn { background: var(--panel-2); color: var
 body.dark .connection-group-switch .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 body.dark .open-connection { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
 body.dark .open-connection:hover { background: var(--accent-2); }
+body.dark #close_connection_window { background: var(--panel-2); color: var(--text-2); border: 1px solid var(--border); }
+body.dark #close_connection_window:hover { background: var(--panel-3); color: #fff; }
 
 /* ace SQL editor — keep theme-tomorrow's token colours (red quoted identifier etc.); only re-skin the surface, and keep it ONE solid dark colour. The gutter, print margin and active-line all match the editor body so it reads solid like the light theme's editor does (theme-tomorrow's defaults for these are near-white). */
 body.dark .ace_editor,

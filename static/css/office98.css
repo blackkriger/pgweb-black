@@ -69,7 +69,8 @@ body.office98 .connection-group-switch .btn:active,
 body.office98 .open-connection:active,
 body.office98 #toggle_theme:active,
 body.office98 #edit_connection:active,
-body.office98 #close_connection:active {
+body.office98 #close_connection:active,
+body.office98 #close_connection_window:active {
   border-color: var(--dk) var(--hi) var(--hi) var(--dk);
   box-shadow: inset 1px 1px 0 0 var(--sh), inset -1px -1px 0 0 var(--hi-soft);
 }
@@ -140,8 +141,9 @@ body.office98 #error_banner { background: var(--navy); color: #fff; }
 /* connection screen */
 body.office98 #connection_window { background: var(--desktop); color: #000; }
 body.office98 .connection-settings .header h1 { color: #fff; font-family: 'MS Sans Serif', Tahoma, sans-serif; text-shadow: 1px 1px 0 #000; }
-body.office98 .connection-settings .header .version,
-body.office98 .connection-settings .connection-ssh-group h3 { color: #fff; }
+body.office98 .connection-settings .header .version { color: #fff; }
+/* "SSH Connection" heading sits inside the gray Win98 form, so it must be black (not white like the header above the form). */
+body.office98 .connection-settings .connection-ssh-group h3 { color: #000; }
 body.office98 .connection-settings .header .update { background: #ffffe1; color: #000; border: 1px solid #000; border-radius: 0; box-shadow: none; font-family: 'MS Sans Serif', Tahoma, sans-serif; }
 body.office98 .connection-settings .header .update a { color: var(--navy); }
 body.office98 .connection-settings form {
@@ -154,7 +156,8 @@ body.office98 .connection-settings .control-label,
 body.office98 .connection-settings .help-block { color: #000; }
 body.office98 .connection-settings .form-control { background: #fff; color: #000; border: 1px solid; border-color: var(--sh) var(--hi) var(--hi) var(--sh); box-shadow: inset 1px 1px 0 0 var(--sh); }
 body.office98 .connection-group-switch .btn,
-body.office98 .open-connection {
+body.office98 .open-connection,
+body.office98 #close_connection_window {
   background: var(--face); color: #000;
   border: 1px solid; border-color: var(--hi) var(--dk) var(--dk) var(--hi);
   box-shadow: inset 1px 1px 0 0 var(--hi-soft), inset -1px -1px 0 0 var(--sh);
