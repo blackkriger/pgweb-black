@@ -2,7 +2,7 @@
 
 A fork of [sosedoff/pgweb](https://github.com/sosedoff/pgweb) — a simple, cross-platform, web-based PostgreSQL database explorer — with **inline cell editing** and a set of data-browsing conveniences added on top. 
 
-Originally forked for the [My_games](https://my-games.uk) project. 
+Originally forked for using within the [My_games](https://my-games.uk) project. 
 
 ## What this fork adds
 
