@@ -1,0 +1,206 @@
+/* ============================================================================
+   Dark theme — SEPARATE, OPTIONAL skin. Self-contained like office98.css so it can be dropped without touching app.css: delete this file, its <link> in index.html, and the "dark" entry in app.js ALL_THEMES + the sun/moon button.
+   Opt-in via the `dark` class on <body>. Neutral charcoal surfaces with a muted violet accent (kept from the Classic palette) and the green Run-Query accent.
+   ============================================================================ */
+body.dark {
+  --bg:          #141318;  /* content / output area */
+  --panel:       #1b1a21;  /* sidebar, bars, modal chrome */
+  --panel-2:     #25232d;  /* table header, raised, default buttons */
+  --panel-3:     #302e3a;  /* hover / active */
+  --border:      #2e2c38;
+  --border-soft: #222029;
+  --input-bg:    #100f15;  /* editor / inputs / value panes (darkest) */
+  --accent:      #735a9c;  /* muted violet — nav, current-db, selections */
+  --accent-2:    #a98fd0;  /* brighter violet — links / fk / hover text */
+  --sel:         #4d3d6e;  /* selected / checked row */
+  --text:        #e7e6ec;
+  --text-2:      #b4b2c0;
+  --text-dim:    #7e7c8b;
+  --row-odd:     #1a1921;
+  --row-even:    #16151d;
+  --row-hover:   #252333;
+  --primary:     #8bbe5b;  /* green action accent (Run Query) */
+  --primary-2:   #a6d579;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body.dark #main,
+body.dark #body,
+body.dark #output { background: var(--bg); }
+
+/* top nav — violet bar; the active tab is a dark cut-out that merges into content */
+body.dark #nav { background: var(--accent); }
+body.dark #nav ul li { color: #ece7f5; }
+body.dark #nav ul li:hover { color: #fff; }
+/* Active tab merges into the surface directly below it, which differs per view (Query -> --input-bg editor, Rows/Diagram -> --panel bar/toolbar, History -> --row-odd, the rest -> --panel-2 matching the table th header); the 1px :before bridge inherits the tab colour so there's never a seam. */
+body.dark #nav ul li.selected { background: var(--panel-2); color: var(--text); }
+body.dark #nav ul li#table_query.selected { background: var(--input-bg); }
+body.dark #nav ul li#table_content.selected,
+body.dark #nav ul li#table_diagram.selected { background: var(--panel); }
+body.dark #nav ul li#table_history.selected { background: var(--row-odd); }
+body.dark #nav ul li.selected:before { background-color: inherit; }
+
+/* nav action buttons (Connect / Disconnect / theme toggles) — sit on the violet bar */
+body.dark #toggle_dark,
+body.dark #toggle_theme,
+body.dark #edit_connection,
+body.dark #close_connection { background: rgba(0, 0, 0, 0.22); color: #fff; border: 1px solid rgba(255, 255, 255, 0.28); }
+body.dark #toggle_dark:hover,
+body.dark #toggle_theme:hover,
+body.dark #edit_connection:hover,
+body.dark #close_connection:hover { background: rgba(0, 0, 0, 0.42); border-color: rgba(255, 255, 255, 0.5); color: #fff; }
+
+/* sidebar */
+body.dark #sidebar { background: var(--panel); border-right: 1px solid var(--border); }
+body.dark #sidebar .current-database { background: var(--accent); color: #fff; }
+body.dark #sidebar .current-database input.typeahead { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
+body.dark #sidebar .objects-search .wrap { border-bottom: 1px solid var(--border); }
+body.dark #sidebar .objects-search input[type="text"] { color: var(--text); background: transparent; }
+body.dark #sidebar .objects-search i.fa-search,
+body.dark #sidebar .objects-search i.fa-times-circle { color: var(--text-dim); }
+body.dark #sidebar div.table-information .title { color: var(--text); border-top: 1px solid var(--border); }
+body.dark #sidebar div.table-information .lines .line,
+body.dark #sidebar div.table-information .lines .line span { color: var(--text-2) !important; }
+
+/* object tree */
+body.dark .schema .schema-name,
+body.dark .schema .schema-container .schema-group .schema-group-title { color: var(--text); }
+body.dark .schema .schema-container .schema-group ul li { color: var(--text-2); }
+body.dark .schema .schema-container .schema-group ul li:hover { background: var(--panel-3); color: #fff; }
+body.dark .schema .schema-container .schema-group ul li.active { background: var(--accent); color: #fff; }
+body.dark .schema .schema-container .schema-group ul li:hover i,
+body.dark .schema .schema-container .schema-group ul li.active i { color: #fff; }
+body.dark .schema i,
+body.dark .schema .schema-group-count { color: var(--text-dim); }
+
+/* query actions bar + buttons */
+body.dark #input .actions { background: var(--panel); border-top: 1px solid var(--border); }
+body.dark #input .actions #result-rows-count,
+body.dark #input .actions #query_progress { color: var(--text-dim); }
+body.dark #input .actions .btn { color: var(--text-2); background: transparent; border: 1px solid var(--border); }
+body.dark #input .actions .btn:hover { color: #fff; background: var(--panel-2) !important; border-color: var(--panel-3); }
+body.dark #input .actions .btn-primary { color: var(--primary); border-color: var(--primary); }
+body.dark #input .actions .btn-primary:hover { color: var(--primary-2) !important; background: transparent !important; border-color: var(--primary-2); }
+body.dark #input_resize_handler { background: var(--border); }
+
+/* pagination + filters */
+body.dark #pagination { background: var(--panel); border-bottom: 1px solid var(--border); }
+body.dark #pagination .filters span,
+body.dark #pagination .current-page,
+body.dark #pagination .rows-quickfilter { color: var(--text-2); }
+body.dark #pagination .filters input,
+body.dark #pagination .filters select,
+body.dark #pagination .rows-quickfilter input { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
+body.dark #pagination .btn-default,
+body.dark #pagination .filters .btn-primary { background: var(--panel-2); color: var(--text-2); border: 1px solid var(--border); }
+body.dark #pagination .btn-default:hover,
+body.dark #pagination .filters .btn-primary:hover { background: var(--panel-3); color: #fff; }
+
+/* results table */
+body.dark #results th { background: var(--panel-2); color: var(--text); border-bottom: 1px solid var(--border); }
+body.dark #results th:hover,
+body.dark #results[data-mode="browse"] th:hover,
+body.dark #results th.active { background: var(--panel-3); }
+body.dark #results td { color: var(--text-2); }
+body.dark #results tr:nth-child(odd) > td { background: var(--row-odd); }
+body.dark #results tr:nth-child(even) > td { background: var(--row-even); }
+body.dark #results tbody tr { border-bottom: 1px solid var(--border-soft); }
+body.dark #results tbody tr:hover td { background: var(--row-hover); }
+body.dark #results tr.selected td,
+body.dark #results tbody tr.row-checked > td { background: var(--sel) !important; color: #fff !important; }
+body.dark #results td div span.null { color: var(--text-dim); }
+body.dark #results td textarea { color: var(--text) !important; }
+body.dark #results td textarea.cell-editor { background: var(--input-bg); color: var(--text) !important; border: 1px solid var(--accent-2); }
+
+/* cell value modal */
+body.dark #content_modal { background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 10px 36px rgba(0, 0, 0, 0.65); }
+body.dark #content_modal .title { background: var(--accent); color: #fff; }
+body.dark #content_modal .actions .fa { color: #fff; }
+body.dark #content_modal .content { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
+/* JSON tree — brighten tokens for the dark value pane */
+body.dark #content_modal .content.jt-mode { color: var(--text); }
+body.dark #content_modal .content.jt-mode .jt-children { border-left-color: var(--border); }
+body.dark #content_modal .content.jt-mode .jt-key { color: #c4a3f0; }
+body.dark #content_modal .content.jt-mode .jt-str { color: #a6d579; }
+body.dark #content_modal .content.jt-mode .jt-num { color: #ff9a7a; }
+body.dark #content_modal .content.jt-mode .jt-bool { color: #7fb0ff; }
+body.dark #content_modal .content.jt-mode .jt-null,
+body.dark #content_modal .content.jt-mode .jt-punc,
+body.dark #content_modal .content.jt-mode .jt-count { color: var(--text-dim); }
+body.dark #content_modal .content.jt-mode .jt-tog { color: var(--text-dim); }
+body.dark #content_modal .content.jt-mode .jt-tog:hover { color: var(--text); }
+
+/* context menus / dropdowns */
+body.dark .dropdown-menu { background: var(--panel-2); border: 1px solid var(--border); box-shadow: 0 6px 22px rgba(0, 0, 0, 0.6); }
+body.dark .dropdown-menu > li > a { color: var(--text-2); }
+body.dark .dropdown-menu > li > a:hover,
+body.dark .dropdown-menu > li > a:focus { background: var(--accent); color: #fff; }
+body.dark .dropdown-menu .divider { background: var(--border); }
+
+/* error banner */
+body.dark #error_banner { background: var(--accent); color: #fff; }
+
+/* connection screen */
+body.dark #connection_window { background: var(--bg); color: var(--text); }
+body.dark .connection-settings .header h1 { color: #fff; }
+body.dark .connection-settings .header .version,
+body.dark .connection-settings .connection-ssh-group h3 { color: var(--text-2); }
+body.dark .connection-settings .header .update { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+body.dark .connection-settings .header .update a { color: var(--accent-2); }
+body.dark .connection-settings form { background: var(--panel); border: 1px solid var(--border); box-shadow: 0 12px 44px rgba(0, 0, 0, 0.65); }
+body.dark .connection-settings label,
+body.dark .connection-settings .control-label,
+body.dark .connection-settings .help-block { color: var(--text-2); }
+body.dark .connection-settings .form-control { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); box-shadow: none; }
+body.dark #connection_error { background: #3a1622; color: #ffb3c0; border: 1px solid #6a2a3a; }
+body.dark .connection-group-switch .btn { background: var(--panel-2); color: var(--text-2); border: 1px solid var(--border); }
+body.dark .connection-group-switch .btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+body.dark .open-connection { background: var(--accent); color: #fff; border: 1px solid var(--accent); }
+body.dark .open-connection:hover { background: var(--accent-2); }
+
+/* ace SQL editor — keep theme-tomorrow's token colours (red quoted identifier etc.); only re-skin the surface, and keep it ONE solid dark colour. The gutter, print margin and active-line all match the editor body so it reads solid like the light theme's editor does (theme-tomorrow's defaults for these are near-white). */
+body.dark .ace_editor,
+body.dark .ace_content { background: var(--input-bg); color: var(--text); }
+body.dark .ace_gutter,
+body.dark .ace_gutter-cell { background: var(--input-bg) !important; color: var(--text-dim); }
+body.dark .ace_print-margin { background: #1a1922; }
+body.dark .ace_marker-layer .ace_active-line { background: rgba(255, 255, 255, 0.03); }
+body.dark #input .input-wrapper,
+body.dark #input .input-wrapper #custom_query { background: var(--input-bg); }
+
+/* editable query bar (Rows view) */
+body.dark #rows_query { background: var(--panel); border-bottom: 1px solid var(--border); }
+body.dark #rows_query_editor { background: var(--input-bg); border: 1px solid var(--border); }
+body.dark #rows_query .btn { color: var(--primary); background: transparent; border: 1px solid var(--primary); }
+body.dark #rows_query .btn:hover { color: var(--primary-2); background: transparent; border-color: var(--primary-2); }
+body.dark #rows_query_sql { color: var(--text-dim); }
+
+/* schema diagram */
+body.dark #diagram_viewport { background-color: var(--bg); background-image: radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px); }
+body.dark .diagram-toolbar { background: var(--panel); border-bottom: 1px solid var(--border); box-shadow: none; }
+body.dark .diagram-toolbar__label { color: var(--text-dim); }
+body.dark #diagram_schema,
+body.dark #diagram_filter { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
+body.dark .diagram-toolbar .btn { background: var(--panel-2); color: var(--text-2); border: 1px solid var(--border); }
+body.dark .diagram-toolbar .btn:hover { background: var(--panel-3); color: #fff; }
+body.dark .diagram-table { background: var(--panel); border: 1px solid var(--border); box-shadow: 0 2px 10px rgba(0, 0, 0, 0.55); }
+body.dark .diagram-table.dragging { box-shadow: 0 8px 26px rgba(0, 0, 0, 0.7); }
+body.dark .diagram-table__head { background: linear-gradient(180deg, var(--accent-2) 0%, var(--accent) 100%); color: #fff; }
+body.dark .diagram-table__cols { background: var(--panel); }
+body.dark .diagram-table__col { border-top: 1px solid var(--border-soft); color: var(--text-2); }
+body.dark .diagram-col__name { color: var(--text); }
+body.dark .diagram-col__type { color: var(--text-dim); }
+body.dark .diagram-col__pk { color: #e0c050; }
+body.dark .diagram-col__fk { color: var(--accent-2); }
+body.dark .diagram-edge { stroke: #6b6480; }
+body.dark .diagram-edge-dot { fill: #9d93b8; }
+body.dark .diagram-status { background: var(--panel); color: var(--text); border: 1px solid var(--border); }
+
+/* placeholders + scrollbars */
+body.dark input::placeholder,
+body.dark textarea::placeholder { color: var(--text-dim); }
+body.dark ::-webkit-scrollbar { width: 12px; height: 12px; }
+body.dark ::-webkit-scrollbar-track { background: var(--bg); }
+body.dark ::-webkit-scrollbar-thumb { background: var(--panel-3); border-radius: 6px; border: 3px solid var(--bg); }
+body.dark ::-webkit-scrollbar-thumb:hover { background: var(--accent); }

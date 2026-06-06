@@ -1861,20 +1861,52 @@ function startCellEdit($div) {
   $editor.on("blur", function() { finish(true); });
 }
 
-// Theme cycling. Each theme id doubles as the <body> class ("classic" = none). The button shows the active theme; clicking advances to the next one. The choice is persisted in localStorage. A previously stored theme that's no longer offered (e.g. the removed "bios") falls back to classic.
-var THEMES = ["classic", "office98"];
-var THEME_LABELS = { classic: "Classic", office98: "Office 98" };
+// Theme model. The "Theme" button toggles the base look (Classic <-> Office 98).
+// "dark" is a separate Classic dark-variant, toggled by the sun/moon button to its
+// left — shown only on the Classic side, never on Office 98. Each non-default theme
+// is its own <body> class + opt-in CSS file; dropping one = remove its file, its
+// <link> in index.html and its entry here. Stored in localStorage; an unknown
+// stored value falls back to classic.
+var ALL_THEMES = ["classic", "office98", "dark"];   // every valid stored value
 
 function currentTheme() {
   var t = localStorage.getItem("pgweb_theme") || "classic";
-  return THEMES.indexOf(t) >= 0 ? t : "classic";
+  return ALL_THEMES.indexOf(t) >= 0 ? t : "classic";
+}
+
+function setTheme(t) {
+  localStorage.setItem("pgweb_theme", t);
+  applyTheme();
+}
+
+// Remembered light/dark choice for the Classic family, so switching to Office 98 and
+// back restores whichever (light Classic or Dark) was active before.
+function classicIsDark() {
+  return localStorage.getItem("pgweb_classic_dark") === "1";
 }
 
 function applyTheme() {
   var t = currentTheme();
-  $("body").removeClass("office98");
+  $("body").removeClass("office98 dark");
   if (t !== "classic") $("body").addClass(t);
-  $("#toggle_theme").text(THEME_LABELS[t]);
+
+  // Theme button shows the base look (dark counts as the Classic side); its tooltip
+  // names the look a click switches TO.
+  $("#toggle_theme")
+    .text(t === "office98" ? "Office 98" : "Classic")
+    .attr("title", t === "office98" ? "Switch to Classic" : "Switch to Office 98");
+
+  // Sun/moon button: only on the Classic side (hidden on Office 98). Moon while
+  // light (click -> dark), sun while dark (click -> light).
+  var $d = $("#toggle_dark");
+  if (t === "office98") {
+    $d.hide();
+  } else {
+    var dark = (t === "dark");
+    $d.show()
+      .attr("title", dark ? "Switch to light" : "Switch to dark")
+      .find("i").attr("class", dark ? "fa fa-sun-o" : "fa fa-moon-o");
+  }
 }
 
 // ---- Schema diagram (visual ER viewer) ------------------------------------
@@ -2423,9 +2455,21 @@ $(document).ready(function() {
   applyTheme();
   $("#toggle_theme").on("click", function(e) {
     e.preventDefault();
-    var next = THEMES[(THEMES.indexOf(currentTheme()) + 1) % THEMES.length];
-    localStorage.setItem("pgweb_theme", next);
-    applyTheme();
+    if (currentTheme() === "office98") {
+      // Back to the Classic family, restoring its remembered light/dark mode.
+      setTheme(classicIsDark() ? "dark" : "classic");
+    } else {
+      // Classic or Dark -> Office 98. Remember the current light/dark choice first.
+      localStorage.setItem("pgweb_classic_dark", currentTheme() === "dark" ? "1" : "0");
+      setTheme("office98");
+    }
+  });
+
+  $("#toggle_dark").on("click", function(e) {
+    e.preventDefault();
+    var goDark = currentTheme() !== "dark";
+    localStorage.setItem("pgweb_classic_dark", goDark ? "1" : "0");
+    setTheme(goDark ? "dark" : "classic");
   });
 
   $("#rows_query_run").on("click", runRowsQuery);
