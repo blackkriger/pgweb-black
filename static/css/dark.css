@@ -116,7 +116,8 @@ body.dark #results td textarea.cell-editor { background: var(--input-bg); color:
 /* cell value modal */
 body.dark #content_modal { background: var(--panel); color: var(--text); border: 1px solid var(--border); box-shadow: 0 10px 36px rgba(0, 0, 0, 0.65); }
 body.dark #content_modal .title { background: var(--accent); color: #fff; }
-body.dark #content_modal .actions .fa { color: #fff; }
+body.dark #content_modal .actions .fa { background: rgba(0, 0, 0, 0.22); color: #fff; border-color: rgba(255, 255, 255, 0.28); }
+body.dark #content_modal .actions .fa:hover { background: rgba(0, 0, 0, 0.42); border-color: rgba(255, 255, 255, 0.5); box-shadow: none; }
 body.dark #content_modal .content { background: var(--input-bg); color: var(--text); border: 1px solid var(--border); }
 /* JSON tree — brighten tokens for the dark value pane */
 body.dark #content_modal .content.jt-mode { color: var(--text); }

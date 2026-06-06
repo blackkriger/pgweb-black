@@ -2329,6 +2329,198 @@ function diagramZoomTo(scale) {
   diagramApplyTransform();
 }
 
+// ---- Diagram export (PNG / SVG) -------------------------------------------
+
+function diagramXmlEsc(s) {
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// Solid colours for the export, picked from the active theme (the on-screen cards use gradients / CSS vars that don't serialise cleanly into a standalone SVG).
+function diagramExportPalette() {
+  var cl = document.body.classList;
+  if (cl.contains("dark")) return { bg: "#141318", card: "#1b1a21", head1: "#a98fd0", head2: "#735a9c", headHoriz: false, headText: "#ffffff", text: "#e7e6ec", type: "#7e7c8b", edge: "#6b6480", dot: "#9d93b8" };
+  if (cl.contains("office98")) return { bg: "#008080", card: "#c0c0c0", head1: "#000080", head2: "#1084d0", headHoriz: true, headText: "#ffffff", text: "#000000", type: "#404040", edge: "#ffffff", dot: "#ffffff" };
+  return { bg: "#fafafa", card: "#ffffff", head1: "#8cc45c", head2: "#7eb54e", headHoriz: false, headText: "#ffffff", text: "#333333", type: "#aaaaaa", edge: "#b9b9b9", dot: "#8a8a8a" };
+}
+
+// Font Awesome webfont as base64, fetched once, so the export can render the real marker glyphs (key/link/search/flag/…) in a standalone SVG. null = fetch failed.
+var diagramFaFont;
+var diagramFaFaceAdded = false;
+
+function diagramLoadFaFont() {
+  if (diagramFaFont !== undefined) return Promise.resolve(diagramFaFont);
+  return fetch("static/fonts/fontawesome-webfont.woff")
+    .then(function(r) { if (!r.ok) throw 0; return r.arrayBuffer(); })
+    .then(function(buf) {
+      var bytes = new Uint8Array(buf), bin = "";
+      for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      diagramFaFont = btoa(bin);
+      return diagramFaFont;
+    })
+    .catch(function() { diagramFaFont = null; return null; });
+}
+
+// Register the export font in the document so canvas rasterisation (PNG) can draw the FA glyphs — an SVG-in-<img> renders glyphs only for already-loaded fonts.
+function diagramEnsureFaFace(font) {
+  if (!font || diagramFaFaceAdded || !window.FontFace || !document.fonts) return Promise.resolve();
+  try {
+    var face = new FontFace("FontAwesomeExport", "url(data:application/font-woff;base64," + font + ") format('woff')");
+    return face.load().then(function(f) { document.fonts.add(f); diagramFaFaceAdded = true; }).catch(function() {});
+  } catch (e) { return Promise.resolve(); }
+}
+
+// Build a self-contained SVG of the whole diagram from the rendered card geometry: header (name centred + rows/size on two right-aligned lines), every column marker (FA glyph + its themed colour, read straight off the rendered icons), name, type (+ nullable "?"), and the live FK bezier edges. fontB64 embeds the FA webfont.
+function diagramExportSvg(fontB64) {
+  var canvas = document.getElementById("diagram_canvas");
+  if (!canvas) return null;
+  var cards = canvas.querySelectorAll(".diagram-table");
+  if (!cards.length) return null;
+
+  var W = canvas.offsetWidth, H = canvas.offsetHeight;
+  var pal = diagramExportPalette();
+  var out = [];
+  out.push('<svg xmlns="http://www.w3.org/2000/svg" width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" font-family="Helvetica, Arial, sans-serif">');
+  if (fontB64) {
+    out.push("<style>@font-face{font-family:'FontAwesomeExport';src:url(data:application/font-woff;base64," + fontB64 + ") format('woff');}</style>");
+  }
+  out.push('<rect x="0" y="0" width="' + W + '" height="' + H + '" fill="' + pal.bg + '"/>');
+
+  // Corner radius straight from the rendered card (0 on Office 98, 6 elsewhere) and a header gradient matching the theme (Office 98 is left→right navy, others top→bottom).
+  var radius = cards[0] ? (parseFloat(getComputedStyle(cards[0]).borderTopLeftRadius) || 0) : 6;
+  var gdir = pal.headHoriz ? 'x1="0" y1="0" x2="1" y2="0"' : 'x1="0" y1="0" x2="0" y2="1"';
+  out.push('<defs><linearGradient id="dgHead" ' + gdir + '><stop offset="0" stop-color="' + pal.head1 + '"/><stop offset="1" stop-color="' + pal.head2 + '"/></linearGradient></defs>');
+
+  var liveSvg = document.getElementById("diagram_edges");
+  if (liveSvg) {
+    liveSvg.querySelectorAll("path").forEach(function(p) {
+      var d = p.getAttribute("d");
+      if (d) out.push('<path d="' + d + '" fill="none" stroke="' + pal.edge + '" stroke-width="1.5" stroke-dasharray="5 4"/>');
+    });
+    // Connection-point dots at edge endpoints (drawn under the cards, so they peek out at the card border just like on screen).
+    liveSvg.querySelectorAll("circle").forEach(function(c) {
+      out.push('<circle cx="' + c.getAttribute("cx") + '" cy="' + c.getAttribute("cy") + '" r="' + (c.getAttribute("r") || 3) + '" fill="' + pal.dot + '"/>');
+    });
+  }
+
+  cards.forEach(function(card) {
+    var name = card.getAttribute("data-table");
+    var p = diagram.pos[name];
+    if (!p) return;
+    var w = card.offsetWidth, h = card.offsetHeight;
+    var headEl = card.querySelector(".diagram-table__head");
+    var headH = headEl ? headEl.offsetHeight : 26;
+
+    // Border: a single stroke when uniform; a Win98 bevel (light top/left, dark bottom/right) when the rendered card uses different colours per side.
+    var cs = getComputedStyle(card);
+    var bcT = cs.borderTopColor, bcB = cs.borderBottomColor, bcL = cs.borderLeftColor, bcR = cs.borderRightColor;
+    var beveled = (bcT !== bcB || bcL !== bcR);
+
+    out.push('<g>');
+    if (beveled) {
+      out.push('<rect x="' + p.x + '" y="' + p.y + '" width="' + w + '" height="' + h + '" fill="' + pal.card + '"/>');
+    } else {
+      out.push('<rect x="' + p.x + '" y="' + p.y + '" width="' + w + '" height="' + h + '" rx="' + radius + '" fill="' + pal.card + '" stroke="' + bcT + '"/>');
+    }
+    // Header — rounded top corners when the theme uses them, square otherwise (Office 98).
+    if (radius > 0) {
+      out.push('<path d="M ' + p.x + ' ' + (p.y + headH) + ' L ' + p.x + ' ' + (p.y + radius) + ' Q ' + p.x + ' ' + p.y + ' ' + (p.x + radius) + ' ' + p.y + ' L ' + (p.x + w - radius) + ' ' + p.y + ' Q ' + (p.x + w) + ' ' + p.y + ' ' + (p.x + w) + ' ' + (p.y + radius) + ' L ' + (p.x + w) + ' ' + (p.y + headH) + ' Z" fill="url(#dgHead)"/>');
+    } else {
+      out.push('<rect x="' + p.x + '" y="' + p.y + '" width="' + w + '" height="' + headH + '" fill="url(#dgHead)"/>');
+    }
+
+    // Header text — read exact rendered positions so name is vertically centred and rows (top) / size (bottom) sit right-aligned on their own lines.
+    if (headEl) {
+      var hn = headEl.querySelector(".diagram-table__name");
+      if (hn && hn.textContent) out.push('<text x="' + (p.x + 10) + '" y="' + (p.y + hn.offsetTop + hn.offsetHeight / 2) + '" fill="' + pal.headText + '" font-weight="bold" font-size="12.5" dominant-baseline="central">' + diagramXmlEsc(hn.textContent) + '</text>');
+      var hr = headEl.querySelector(".diagram-table__rows");
+      if (hr && hr.textContent) out.push('<text x="' + (p.x + w - 10) + '" y="' + (p.y + hr.offsetTop + hr.offsetHeight / 2) + '" fill="' + pal.headText + '" font-size="10" text-anchor="end" dominant-baseline="central" opacity="0.85">' + diagramXmlEsc(hr.textContent) + '</text>');
+      var hs = headEl.querySelector(".diagram-table__size");
+      if (hs && hs.textContent) out.push('<text x="' + (p.x + w - 10) + '" y="' + (p.y + hs.offsetTop + hs.offsetHeight / 2) + '" fill="' + pal.headText + '" font-size="10" text-anchor="end" dominant-baseline="central" opacity="0.85">' + diagramXmlEsc(hs.textContent) + '</text>');
+    }
+
+    card.querySelectorAll(".diagram-table__col").forEach(function(colEl) {
+      var cy = p.y + colEl.offsetTop + colEl.offsetHeight / 2;
+      // Row separator line (matches the column's top border).
+      out.push('<line x1="' + p.x + '" y1="' + (p.y + colEl.offsetTop) + '" x2="' + (p.x + w) + '" y2="' + (p.y + colEl.offsetTop) + '" stroke="' + getComputedStyle(colEl).borderTopColor + '"/>');
+      // Marker icons — the actual FA glyph + themed colour, at their on-screen x.
+      if (fontB64) {
+        colEl.querySelectorAll(".diagram-col__key i").forEach(function(icon) {
+          var g = (getComputedStyle(icon, "::before").content || "").replace(/^["']|["']$/g, "");
+          if (!g || g === "none") return;
+          var gx = p.x + icon.offsetLeft + icon.offsetWidth / 2;
+          out.push('<text x="' + gx + '" y="' + cy + '" fill="' + getComputedStyle(icon).color + '" font-family="FontAwesomeExport" font-size="11" text-anchor="middle" dominant-baseline="central">' + diagramXmlEsc(g) + '</text>');
+        });
+      }
+      var nmEl = colEl.querySelector(".diagram-col__name");
+      if (nmEl) out.push('<text x="' + (p.x + nmEl.offsetLeft) + '" y="' + cy + '" fill="' + pal.text + '" font-size="11.5" dominant-baseline="central">' + diagramXmlEsc(nmEl.textContent) + '</text>');
+      var tyEl = colEl.querySelector(".diagram-col__type");
+      if (tyEl) out.push('<text x="' + (p.x + tyEl.offsetLeft) + '" y="' + cy + '" fill="' + pal.type + '" font-size="10.5" dominant-baseline="central">' + diagramXmlEsc(tyEl.textContent) + '</text>');
+    });
+
+    // Win98 bevel frame on top of everything (light top/left, dark bottom/right).
+    if (beveled) {
+      out.push('<line x1="' + p.x + '" y1="' + p.y + '" x2="' + (p.x + w) + '" y2="' + p.y + '" stroke="' + bcT + '"/>');
+      out.push('<line x1="' + p.x + '" y1="' + p.y + '" x2="' + p.x + '" y2="' + (p.y + h) + '" stroke="' + bcL + '"/>');
+      out.push('<line x1="' + p.x + '" y1="' + (p.y + h) + '" x2="' + (p.x + w) + '" y2="' + (p.y + h) + '" stroke="' + bcB + '"/>');
+      out.push('<line x1="' + (p.x + w) + '" y1="' + p.y + '" x2="' + (p.x + w) + '" y2="' + (p.y + h) + '" stroke="' + bcR + '"/>');
+    }
+    out.push('</g>');
+  });
+
+  out.push('</svg>');
+  return out.join("");
+}
+
+function diagramSaveBlob(blob, filename) {
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function() { URL.revokeObjectURL(url); }, 1000);
+}
+
+function diagramExportName(ext) {
+  return ((diagram.schema || "schema") + "-diagram." + ext);
+}
+
+function diagramDownloadSvg() {
+  diagramLoadFaFont().then(function(font) {
+    var svg = diagramExportSvg(font);
+    if (!svg) { showErrorBanner("Nothing to export — open a schema first."); return; }
+    diagramSaveBlob(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }), diagramExportName("svg"));
+  });
+}
+
+function diagramDownloadPng() {
+  diagramLoadFaFont()
+    .then(function(font) { return diagramEnsureFaFace(font).then(function() { return font; }); })
+    .then(function(font) {
+      var svg = diagramExportSvg(font);
+      if (!svg) { showErrorBanner("Nothing to export — open a schema first."); return; }
+      var url = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml;charset=utf-8" }));
+      var img = new Image();
+      img.onload = function() {
+        var scale = 2; // crisper raster
+        var c = document.createElement("canvas");
+        c.width = img.width * scale;
+        c.height = img.height * scale;
+        var ctx = c.getContext("2d");
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+        c.toBlob(function(b) {
+          if (b) diagramSaveBlob(b, diagramExportName("png"));
+          else showErrorBanner("PNG export failed.");
+        }, "image/png");
+      };
+      img.onerror = function() { URL.revokeObjectURL(url); showErrorBanner("PNG export failed."); };
+      img.src = url;
+    });
+}
+
 // ---- JSONB viewer ---------------------------------------------------------
 
 // Parse a cell string into a JSON object/array, or undefined if it isn't one.
@@ -2622,6 +2814,9 @@ $(document).ready(function() {
     diagramDrawEdges();
     diagramSavePositions();
   });
+
+  $("#diagram_export_png").on("click", diagramDownloadPng);
+  $("#diagram_export_svg").on("click", diagramDownloadSvg);
 
   $("#diagram_zoom_in").on("click",    function() { diagramZoom(1.2); });
   $("#diagram_zoom_out").on("click",   function() { diagramZoom(0.8); });
