@@ -1,6 +1,6 @@
 # pgweb-black
 
-A fork of [sosedoff/pgweb](https://github.com/sosedoff/pgweb) — a simple, cross-platform, web-based PostgreSQL database explorer — with **inline cell editing** added on top. 
+A fork of [sosedoff/pgweb](https://github.com/sosedoff/pgweb) — a simple, cross-platform, web-based PostgreSQL database explorer — with **inline cell editing** and a set of data-browsing conveniences added on top. 
 
 Originally forked for the [My_games](https://my-games.uk) project. 
 
@@ -9,6 +9,14 @@ Originally forked for the [My_games](https://my-games.uk) project.
 - **Inline cell editing in the table rows view.** Double-click a cell to edit its value in place — `Enter` saves, `Shift+Enter` inserts a newline, `Esc` cancels. Saving runs a primary-key–scoped, parameterized `UPDATE`, so only the exact row is touched and values are cast to their own column types.
 - Editing is available only while **browsing a table's rows** (not on arbitrary query results) and only for tables that have a **primary key**.
 - The right-click cell menu carries the value actions: **Display Value** (the read-only viewer the double-click used to open), **Copy Value**, **Set NULL**, and **Filter Rows By Value**. 
+- **Multi-row selection & bulk actions.** A select-all checkbox plus per-row checkboxes let you pick rows, then **delete the selection** or **export it** as CSV / JSON / XML from the toolbar's export-selected submenu.
+- **JSON(B) tree viewer/editor.** Expand, browse, and edit `json` / `jsonb` cell values as a collapsible tree instead of raw text.
+- **Foreign-key navigation.** A "Go to *table.column*" item in the row context menu jumps straight to the referenced row.
+- **Copy Row as INSERT.** Right-click a row to copy a ready-to-run `INSERT` statement.
+- **Client-side row filtering.** A "Filter rows" box filters the current page instantly — no server round-trip.
+- **Precise query timing.** The Query page shows the real sub-millisecond server-side execution time, not a rounded "0 ms".
+- **Query-bar word wrap.** Long queries wrap instead of scrolling off the edge.
+- **Classic ↔ Office 98 themes.** Toggle between the classic look and a Windows-98–styled theme.
 
 ## Usage
 
