@@ -8,13 +8,14 @@ Originally forked for the [My_games](https://my-games.uk) project.
 
 - **Inline cell editing in the table rows view.** Double-click a cell to edit its value in place — `Enter` saves, `Shift+Enter` inserts a newline, `Esc` cancels. Saving runs a primary-key–scoped, parameterized `UPDATE`, so only the exact row is touched and values are cast to their own column types.
 - Editing is available only while **browsing a table's rows** (not on arbitrary query results) and only for tables that have a **primary key**.
+- **Visual schema diagram (ER viewer).** Browse the schema as draggable table cards linked by their foreign keys, with pan, zoom and PK/FK markers. 
 - **Multi-row selection & bulk actions.** A select-all checkbox plus per-row checkboxes let you pick rows, then **delete the selection** or **export it** as CSV / JSON / XML from the toolbar's export-selected submenu.
 - **JSON(B) tree viewer/editor.** Expand, browse, and edit `json` / `jsonb` cell values as a collapsible tree.
 - **Foreign-key navigation.** A "Go to *table.column*" item in the row context menu jumps straight to the referenced row.
 - **Copy Row as INSERT.** Right-click a row to copy a ready-to-run `INSERT` statement.
 - **Client-side row filtering.** A "Filter rows" box filters the current page locally.
 - **Precise query timing.** The Query page shows the real sub-millisecond server-side execution time, not a rounded one. 
-- **Classic ↔ Office 98 themes.** Toggle between the classic look and a Windows-98–styled theme.
+- **Classic ↔ Office 98 themes.** Toggle between the classic look and a Windows-98–styled theme. Now with a sun/moon button, that toggles a dark, purple-tinted variant of the classic theme. 
 
 ## Usage
 
