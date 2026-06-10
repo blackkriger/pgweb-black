@@ -23,6 +23,7 @@
   <script type="text/javascript" src="static/js/base64.js"></script>
 </head>
 <body>
+  <script>/* Set the theme body class synchronously before the page paints — avoids a Classic-theme flash for users whose saved theme is office98 or dark. applyTheme() in DOMReady reconciles the buttons and any later toggles. */(function(){try{var t=localStorage.getItem("pgweb_theme")||"classic";if(t==="office98"||t==="dark")document.body.classList.add(t);}catch(e){}})();</script>
   <div id="main">
     <div id="nav">
       <ul>
@@ -370,7 +371,21 @@
       <li><a href="#" data-action="display_value">Display Value</a></li>
       <li><a href="#" data-action="copy_value">Copy Value</a></li>
       <li><a href="#" data-action="copy_row">Copy Row as INSERT</a></li>
-      <li><a href="#" data-action="filter_by_value">Filter Rows By Value</a></li>
+      <li class="dropdown-submenu">
+        <a href="#" class="filter-parent">Filter Rows...<span class="submenu-arrow" aria-hidden="true">▸</span></a>
+        <ul class="dropdown-menu">
+          <li><a href="#" class="filter-op" data-op="eq">= value</a></li>
+          <li><a href="#" class="filter-op" data-op="ne">&ne; value</a></li>
+          <li><a href="#" class="filter-op" data-op="gt">&gt; value</a></li>
+          <li><a href="#" class="filter-op" data-op="lt">&lt; value</a></li>
+          <li><a href="#" class="filter-op" data-op="gte">&ge; value</a></li>
+          <li><a href="#" class="filter-op" data-op="lte">&le; value</a></li>
+          <li><a href="#" class="filter-op" data-op="ilike">contains (ILIKE)</a></li>
+          <li class="divider"></li>
+          <li><a href="#" class="filter-op" data-op="null">IS NULL</a></li>
+          <li><a href="#" class="filter-op" data-op="notnull">IS NOT NULL</a></li>
+        </ul>
+      </li>
       <li class="divider edit-divider"></li>
       <li class="row-edit-item"><a href="#" data-action="set_null">Set NULL</a></li>
       <li class="row-export-item divider"></li>

@@ -32,7 +32,7 @@ WHERE
   AND a.attnum > 0
   AND NOT a.attisdropped
 GROUP BY
-  c.relname, a.attname, a.atttypid, a.atttypmod, a.attnum,
+  c.oid, c.relname, a.attname, a.atttypid, a.atttypmod, a.attnum,
   a.attnotnull, a.attidentity, a.attgenerated
 ORDER BY
   c.relname, a.attnum

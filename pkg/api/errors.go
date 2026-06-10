@@ -15,4 +15,5 @@ var (
 	errDatabaseNameRequired = errors.New("Database name is required")
 	errColumnRequired       = errors.New("Column parameter is required")
 	errRowRequired          = errors.New("Row parameter is required")
+	errCrossOrigin          = errors.New("Cross-origin request blocked")
 )

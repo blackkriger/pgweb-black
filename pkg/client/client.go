@@ -49,11 +49,52 @@ type Client struct {
 }
 
 func getSchemaAndTable(str string) (string, string) {
-	chunks := strings.Split(str, ".")
-	if len(chunks) == 1 {
-		return "public", chunks[0]
+	parts := splitQualifiedName(str)
+	if len(parts) == 1 {
+		return "public", parts[0]
 	}
-	return chunks[0], chunks[1]
+	return parts[0], parts[1]
+}
+
+// splitQualifiedName splits "schema.table" / "schema"."table" / a bare "table" into its components, honouring Postgres double-quoted identifiers (a `.` inside quotes is part of the name, `""` inside quotes is a literal `"`). Anything beyond schema.table is preserved as extra parts; callers that want exactly two take the first two.
+func splitQualifiedName(str string) []string {
+	parts := []string{}
+	var buf strings.Builder
+	inQuote := false
+	for i := 0; i < len(str); i++ {
+		c := str[i]
+		if inQuote {
+			if c == '"' {
+				if i+1 < len(str) && str[i+1] == '"' {
+					buf.WriteByte('"')
+					i++
+				} else {
+					inQuote = false
+				}
+				continue
+			}
+			buf.WriteByte(c)
+			continue
+		}
+		switch c {
+		case '"':
+			inQuote = true
+		case '.':
+			parts = append(parts, buf.String())
+			buf.Reset()
+		default:
+			buf.WriteByte(c)
+		}
+	}
+	if buf.Len() > 0 || strings.HasSuffix(str, ".") {
+		parts = append(parts, buf.String())
+	}
+	return parts
+}
+
+// pgQuoteIdent quotes a Postgres identifier (table/column name). Doubles embedded `"` so a name like `a"b` becomes `"a""b"`. Used wherever an identifier reaches a SQL string via fmt.Sprintf.
+func pgQuoteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
 }
 
 func New() (*Client, error) {

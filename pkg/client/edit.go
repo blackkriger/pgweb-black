@@ -38,7 +38,7 @@ func parseColumnsMeta(meta *Result) (map[string]string, []string) {
 	return types, primaryKey
 }
 
-// buildPrimaryKeyMatch builds the parameterized WHERE conditions that match a single row by its primary key, reading key values from rowValues. Placeholder numbering starts at startIdx; values are cast to their own column types.
+// buildPrimaryKeyMatch builds the parameterized WHERE conditions that match a single row by its primary key, reading key values from rowValues. Placeholder numbering starts at startIdx; values are cast to their own column types. Column names go through pgQuoteIdent so a name containing `"` can't break out of the identifier.
 func buildPrimaryKeyMatch(types map[string]string, primaryKey []string, rowValues map[string]*string, startIdx int) (string, []interface{}, error) {
 	conds := make([]string, 0, len(primaryKey))
 	args := make([]interface{}, 0, len(primaryKey))
@@ -48,7 +48,7 @@ func buildPrimaryKeyMatch(types map[string]string, primaryKey []string, rowValue
 			return "", nil, fmt.Errorf("missing primary key value for column %q", col)
 		}
 		args = append(args, *val)
-		conds = append(conds, fmt.Sprintf(`"%s" = $%d::%s`, col, startIdx+i, types[col]))
+		conds = append(conds, fmt.Sprintf(`%s = $%d::%s`, pgQuoteIdent(col), startIdx+i, types[col]))
 	}
 	return strings.Join(conds, " AND "), args, nil
 }
@@ -74,10 +74,10 @@ func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Resu
 	}
 
 	args := []interface{}{}
-	setClause := fmt.Sprintf(`"%s" = NULL`, opts.Column)
+	setClause := fmt.Sprintf(`%s = NULL`, pgQuoteIdent(opts.Column))
 	if !opts.IsNull {
 		args = append(args, opts.Value)
-		setClause = fmt.Sprintf(`"%s" = $%d::%s`, opts.Column, len(args), types[opts.Column])
+		setClause = fmt.Sprintf(`%s = $%d::%s`, pgQuoteIdent(opts.Column), len(args), types[opts.Column])
 	}
 
 	where, whereArgs, err := buildPrimaryKeyMatch(types, primaryKey, opts.RowValues, len(args)+1)
@@ -86,7 +86,7 @@ func (client *Client) UpdateTableRow(table string, opts UpdateRowOptions) (*Resu
 	}
 	args = append(args, whereArgs...)
 
-	sql := fmt.Sprintf(`UPDATE "%s"."%s" SET %s WHERE %s`, schema, name, setClause, where)
+	sql := fmt.Sprintf(`UPDATE %s.%s SET %s WHERE %s`, pgQuoteIdent(schema), pgQuoteIdent(name), setClause, where)
 	return client.query(sql, args...)
 }
 
@@ -112,7 +112,7 @@ func (client *Client) DeleteTableRow(table string, rowValues map[string]*string)
 		return nil, err
 	}
 
-	sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s`, schema, name, where)
+	sql := fmt.Sprintf(`DELETE FROM %s.%s WHERE %s`, pgQuoteIdent(schema), pgQuoteIdent(name), where)
 	return client.query(sql, args...)
 }
 
@@ -148,7 +148,7 @@ func (client *Client) DeleteTableRows(table string, rows []map[string]*string) (
 		args = append(args, whereArgs...)
 	}
 
-	sql := fmt.Sprintf(`DELETE FROM "%s"."%s" WHERE %s`, schema, name, strings.Join(conds, " OR "))
+	sql := fmt.Sprintf(`DELETE FROM %s.%s WHERE %s`, pgQuoteIdent(schema), pgQuoteIdent(name), strings.Join(conds, " OR "))
 	return client.query(sql, args...)
 }
 
@@ -184,6 +184,6 @@ func (client *Client) SelectTableRows(table string, rows []map[string]*string) (
 		args = append(args, whereArgs...)
 	}
 
-	sql := fmt.Sprintf(`SELECT * FROM "%s"."%s" WHERE %s`, schema, name, strings.Join(conds, " OR "))
+	sql := fmt.Sprintf(`SELECT * FROM %s.%s WHERE %s`, pgQuoteIdent(schema), pgQuoteIdent(name), strings.Join(conds, " OR "))
 	return client.query(sql, args...)
 }

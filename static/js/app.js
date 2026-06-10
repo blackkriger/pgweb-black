@@ -286,6 +286,11 @@ function escapeHtml(str) {
   return "<span class='null'>null</span>";
 }
 
+// HTML-attribute-safe escape: jQuery.text() leaves quotes intact, so attribute interpolation needs an extra pass to keep weird identifiers (e.g. PG column name containing ' or ") from breaking out.
+function escapeAttr(str) {
+  return String(str == null ? "" : str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+}
+
 function unescapeHtml(str){
   var e = document.createElement("div");
   e.innerHTML = str;
@@ -314,15 +319,31 @@ function resetTable() {
     show();
 }
 
-// Client-side quick filter: hide rows on the current page whose data cells don't contain the typed substring (case-insensitive, all columns). Pure DOM, no server round-trip — complements the SQL query bar.
+// Cache the lowercased concatenated cell text on each tr so applyQuickFilter doesn't walk the DOM and re-lowercase on every keystroke. Called once per buildTable.
+function indexRowsForQuickFilter() {
+  $("#results_body tr").each(function() {
+    var txt = "";
+    var cells = this.querySelectorAll("td[data-name]");
+    for (var i = 0; i < cells.length; i++) txt += cells[i].textContent + "\n";
+    this._qfText = txt.toLowerCase();
+  });
+}
+
+// Client-side quick filter: hide rows on the current page whose cached row text doesn't contain the typed substring (case-insensitive). Pure DOM, no server round-trip — complements the SQL query bar.
 function applyQuickFilter() {
   var q = $.trim($("#rows_quickfilter").val() || "").toLowerCase();
-  var $rows = $("#results_body tr");
-  if (!q) { $rows.show(); return; }
-  $rows.each(function() {
-    var $tr = $(this);
-    $tr.toggle($tr.children("td[data-name]").text().toLowerCase().indexOf(q) >= 0);
-  });
+  var rows = document.querySelectorAll("#results_body tr");
+  for (var i = 0; i < rows.length; i++) {
+    var tr = rows[i];
+    tr.style.display = (!q || (tr._qfText || "").indexOf(q) >= 0) ? "" : "none";
+  }
+}
+
+// Debounced wrapper for the input handler so a fast typer isn't paying the per-keystroke filter cost on 1k-row pages.
+var quickFilterTimer = null;
+function applyQuickFilterDebounced() {
+  if (quickFilterTimer) clearTimeout(quickFilterTimer);
+  quickFilterTimer = setTimeout(applyQuickFilter, 80);
 }
 
 function performTableAction(table, action, el) {
@@ -433,13 +454,14 @@ function sortArrow(direction) {
   }
 }
 
-// Precise server-side query time for the Query page (microsecond resolution; sub-ms queries would otherwise round to "0 ms"). Falls back to the integer ms field.
+// Wall-clock time of the query from queryStart in client.query() until every row has been fetched into pgweb (execution + row fetch), microsecond resolution. Display precision scales with magnitude so trailing zeros aren't stripped and sub-ms reads aren't rounded to "0 ms"; switches to seconds past 1 s. Falls back to the integer query_duration_ms field if the microsecond field is missing.
 function serverQueryTime(stats) {
   if (!stats) return "";
-  if (typeof stats.query_total_us === "number") {
-    return parseFloat((stats.query_total_us / 1000).toFixed(2)) + " ms";
-  }
-  return stats.query_duration_ms + " ms";
+  if (typeof stats.query_total_us !== "number") return stats.query_duration_ms + " ms";
+  var us = stats.query_total_us;
+  if (us >= 1000000) return (us / 1000000).toFixed(3) + " s";
+  if (us >= 100000)  return (us / 1000).toFixed(2)    + " ms";
+  return (us / 1000).toFixed(3) + " ms";
 }
 
 function buildTable(results, sortColumn, sortOrder, options) {
@@ -448,7 +470,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
 
   resetTable();
   // Query execution time (server) pinned to the bottom of the query bar.
-  $("#rows_query_sql").text(results.stats ? results.stats.query_duration_ms + " ms" : "");
+  $("#rows_query_sql").text(results.stats ? serverQueryTime(results.stats) : "");
 
   if (results.error) {
     $("#results_header").html("");
@@ -498,7 +520,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
 
     // Add all actual row data here. data-name carries the column name so cell edit / Set NULL / delete / filter resolve it without a positional th lookup (the leading checkbox column would otherwise shift those indices).
     for (i in row) {
-      r += "<td data-col='" + i + "' data-name='" + results.columns[i] + "'><div>" + escapeHtml(row[i]) + "</div></td>";
+      r += "<td data-col='" + i + "' data-name=\"" + escapeAttr(results.columns[i]) + "\"><div>" + escapeHtml(row[i]) + "</div></td>";
     }
 
     // Add row action button
@@ -511,6 +533,7 @@ function buildTable(results, sortColumn, sortOrder, options) {
 
   $("#results_header").html(cols);
   $("#results_body").html(rows);
+  indexRowsForQuickFilter();
 
   // Show number of rows rendered on the page
   if (results.stats) {
@@ -661,6 +684,8 @@ function showTableContent(sortColumn, sortOrder) {
     sort_column: sortColumn,
     sort_order:  sortOrder
   };
+  // Carry a WHERE captured from the rows-bar (runRowsQuery / openFkTarget) across pagination + sort. Cleared when the active sidebar item changes so it can't leak between tables.
+  if (rowsBrowseWhere) opts.where = rowsBrowseWhere;
 
   getTableRows(name, opts, function(data) {
     $("#input").hide();
@@ -678,7 +703,29 @@ function showTableContent(sortColumn, sortOrder) {
 
     $("#results").data("mode", "browse").data("table", name);
     fetchFkMap(name, $.noop);
+    fetchColTypes(name);
   });
+}
+
+// Captured WHERE from the rows-bar — survives pagination/sort. null = no filter.
+var rowsBrowseWhere = null;
+
+// Try to parse a rows-bar SQL as the structured browse form `SELECT * FROM <table> [WHERE ...] [ORDER BY <col> ASC|DESC]` so pagination/sort can continue using getTableRows. Returns { where, sortColumn, sortOrder } on match, null otherwise. Conservative on purpose — anything with JOINs, subqueries, LIMIT/OFFSET, GROUP BY, multiple statements, etc. falls through and runs as raw SQL via executeQuery.
+function parseBrowseSql(sql, table) {
+  var m = sql.replace(/;\s*$/, "").match(/^\s*SELECT\s+\*\s+FROM\s+("[^"]+"\."[^"]+"|"[^"]+"|[\w$]+(?:\.[\w$]+)?)\s*(?:WHERE\s+([\s\S]+?))?\s*(?:ORDER\s+BY\s+([\s\S]+?))?\s*$/i);
+  if (!m) return null;
+  var ref = m[1].replace(/"/g, ""), norm = String(table || "").replace(/"/g, "");
+  if (ref !== norm && ref !== norm.split(".").pop()) return null;
+  // Reject clauses the server will also try to apply (LIMIT/OFFSET) or that turn this into a real query rather than a filter (GROUP BY/HAVING/UNION/multi-statement).
+  if (m[2] && /\b(LIMIT|OFFSET|GROUP\s+BY|HAVING|UNION)\b/i.test(m[2])) return null;
+  if (m[2] && m[2].indexOf(";") >= 0) return null;
+  var sortColumn = null, sortOrder = null;
+  if (m[3]) {
+    var ord = m[3].trim().match(/^"?([\w$]+)"?(?:\s+(ASC|DESC))?$/i);
+    if (!ord) return null;
+    sortColumn = ord[1]; sortOrder = (ord[2] || "ASC").toUpperCase();
+  }
+  return { where: m[2] ? m[2].trim() : null, sortColumn: sortColumn, sortOrder: sortOrder };
 }
 
 // Reconstruct the SELECT that the rows view runs (minus the auto LIMIT/OFFSET) so it can be shown and edited in the query bar.
@@ -689,16 +736,27 @@ function buildBrowseQuery(table, opts) {
   return sql;
 }
 
-// Run the (possibly edited) query bar SQL in place: render its rows, keeping the bar and pagination/filters visible. The rows bar always runs against the current table, so keep the result editable (cell edit / Set NULL / row + bulk delete) just like plain browse — rows missing a primary key column simply fail server-side with an error banner.
+// Run the (possibly edited) query bar SQL in place. When the SQL still matches the structured browse form (`SELECT * FROM <table> [WHERE ...] [ORDER BY ...]`) the WHERE/ORDER are captured into rowsBrowseWhere and the result is loaded via getTableRows so pagination + sort keep working. Anything else falls back to /query as opaque custom SQL; pagination is hidden then.
 function runRowsQuery() {
   var sql = rowsEditor ? $.trim(rowsEditor.getValue()) : "";
   if (!sql) return;
 
   var table = $("#results").data("table");
+  var parsed = parseBrowseSql(sql, table);
+  if (parsed) {
+    rowsBrowseWhere = parsed.where;
+    $(".current-page").data("page", 1);
+    showTableContent(parsed.sortColumn, parsed.sortOrder);
+    return;
+  }
+
+  rowsBrowseWhere = null;
+  $("#body").removeClass("with-pagination");
   executeQuery(sql, function(data) {
     buildTable(data, null, null, { selectable: true });
     $("#results").data("mode", "browse").data("table", table);
     fetchFkMap(table, $.noop);
+    fetchColTypes(table);
   });
 }
 
@@ -1139,7 +1197,7 @@ function initRowsEditor() {
 
   rowsEditor.commands.addCommand({
     name: "run_rows_query",
-    bindKey: { win: "Return|Ctrl-Enter", mac: "Return|Command-Enter" },
+    bindKey: { win: "Ctrl-Enter", mac: "Command-Enter" },
     exec: function(ed) {
       if (ed.completer && ed.completer.activated) return false;
       runRowsQuery();
@@ -1277,6 +1335,40 @@ function getConnectionString() {
   return url;
 }
 
+// Last <td> on which a row context menu opened — captured in `before` so the filter submenu (whose items don't fire onItem) can still read the clicked column + value.
+var lastMenuTd = null;
+
+// Build a WHERE clause for the row context-menu's Filter Rows submenu and run it through the rows-bar. The structured `SELECT * FROM <table> WHERE <cond>` form runs through parseBrowseSql → getTableRows, so pagination/sort survive. = and ≠ cast both sides to text so non-string types (uuid, timestamptz, inet, json, arrays) compare without implicit-cast failures; >/</≥/≤ rely on PG's implicit cast (works for numerics, timestamps, etc.); ILIKE wraps the cell value as a %substring% pattern.
+function applyRowFilter(op) {
+  if ($("#results").data("mode") != "browse" || !rowsEditor || !lastMenuTd || !lastMenuTd.length) return;
+  var $td = lastMenuTd;
+  var colName = $td.data("name");
+  if (colName == null) return;
+  var $div = $td.children("div");
+  var isNull = !!$div.children("span.null").length;
+  var raw = isNull ? null : $div.text();
+  var qcol = quoteIdent(colName);
+
+  var cond;
+  switch (op) {
+    case "null":    cond = qcol + " IS NULL"; break;
+    case "notnull": cond = qcol + " IS NOT NULL"; break;
+    case "eq":      cond = isNull ? qcol + " IS NULL"     : qcol + "::text = '"  + sqlEscapeStr(raw) + "'"; break;
+    case "ne":      cond = isNull ? qcol + " IS NOT NULL" : qcol + "::text <> '" + sqlEscapeStr(raw) + "'"; break;
+    case "gt":      if (isNull) return; cond = qcol + " > '"  + sqlEscapeStr(raw) + "'"; break;
+    case "lt":      if (isNull) return; cond = qcol + " < '"  + sqlEscapeStr(raw) + "'"; break;
+    case "gte":     if (isNull) return; cond = qcol + " >= '" + sqlEscapeStr(raw) + "'"; break;
+    case "lte":     if (isNull) return; cond = qcol + " <= '" + sqlEscapeStr(raw) + "'"; break;
+    case "ilike":   if (isNull) return; cond = qcol + "::text ILIKE '%" + sqlEscapeStr(raw) + "%'"; break;
+    default: return;
+  }
+
+  var t = $("#results").data("table");
+  rowsEditor.setValue("SELECT * FROM " + getQuotedSchemaTableName(t) + " WHERE " + cond);
+  rowsEditor.clearSelection();
+  runRowsQuery();
+}
+
 // Add a context menu to the results table header columns
 function bindTableHeaderMenu() {
   $("#results_header").contextmenu({
@@ -1342,10 +1434,13 @@ function bindTableHeaderMenu() {
         $("#results_row_menu [data-action='delete_row']").text(selected > 0 ? "Delete Selected (" + selected + ")…" : "Delete Row…");
       }
 
+      // Stash the right-clicked cell for handlers that fire from submenu items (filter operators) — those bypass onItem so they can't read `context` directly.
+      lastMenuTd = $(e.target).closest("td");
+
       // FK navigation: a top "Go to <table>.<column>" entry for a foreign-key cell (browse only, non-null). fkCache is warmed when the table loads.
       var fk = null, fkVal = null;
       if (editable) {
-        var $td = $(e.target).closest("td");
+        var $td = lastMenuTd;
         var col = $td.data("name");
         var map = fkCache[$("#results").data("table")] || {};
         var $div = $td.children("div");
@@ -1386,18 +1481,6 @@ function bindTableHeaderMenu() {
             deleteRow($(context).closest("tr"));
           }
           break;
-        case "filter_by_value":
-          // The dedicated search form is gone — express the filter in the editable query bar instead (same result, fully editable afterwards).
-          if ($("#results").data("mode") != "browse" || !rowsEditor) break;
-          var t = $("#results").data("table");
-          var colName = $(context).data("name");
-          var $cellDiv = $(context).children("div");
-          var cond = $cellDiv.children("span.null").length
-            ? '"' + colName + '" IS NULL'
-            : '"' + colName + "\" = '" + String($cellDiv.text()).replace(/'/g, "''") + "'";
-          rowsEditor.setValue("SELECT * FROM " + getQuotedSchemaTableName(t) + " WHERE " + cond);
-          rowsEditor.clearSelection();
-          runRowsQuery();
       }
     }
   });
@@ -1479,6 +1562,16 @@ function getQuotedSchemaTableName(table) {
     return ['"', schemaTableComponents[0], '"."', schemaTableComponents[1], '"'].join('');
   }
   return table;
+}
+
+// Quote a SQL identifier (column/table name). Doubles embedded " per PG rules so an identifier like a"b becomes "a""b".
+function quoteIdent(name) {
+  return '"' + String(name == null ? "" : name).replace(/"/g, '""') + '"';
+}
+
+// Escape a string for use inside a single-quoted SQL literal (doubles embedded ').
+function sqlEscapeStr(s) {
+  return String(s == null ? "" : s).replace(/'/g, "''");
 }
 
 function bindContextMenus() {
@@ -2090,11 +2183,20 @@ function renderDiagram() {
     canvas.appendChild(card);
   });
 
-  diagramLayout();
-  diagramApplyPositions();
-  diagramFitView();
-  diagramDrawEdges();
-  diagram.rendered = true;
+  // Layout reads each card's offsetHeight to stack cards in a column without overlap. If the Font Awesome webfont is still loading on the first ever diagram open, the PK/FK/index icons inside .diagram-col__key are 0-wide and the measured heights are too short — cards then overlap once the font swaps in. Defer the initial layout until document.fonts.ready resolves (typically instant on subsequent visits thanks to the HTTP cache). Skip the wait if the user already has saved positions for this schema — those are restored as-is regardless of font state.
+  var hasSaved = data.tables.some(function(t) { return !!diagram.pos[t.name]; });
+  var commitLayout = function() {
+    diagramLayout();
+    diagramApplyPositions();
+    diagramFitView();
+    diagramDrawEdges();
+    diagram.rendered = true;
+  };
+  if (!hasSaved && document.fonts && document.fonts.ready && typeof document.fonts.ready.then === "function") {
+    document.fonts.ready.then(commitLayout);
+  } else {
+    commitLayout();
+  }
 }
 
 // Deterministic layout: each connected component is laid out left-to-right by BFS level, then components are shelf-packed into wrapping bands. Positions are applied only to tables that don't already have a (saved) one, so manual drags and saved layouts survive a re-render; "Auto layout" clears pos to force all.
@@ -2613,6 +2715,30 @@ function fetchFkMap(table, cb) {
   });
 }
 
+// Cached column -> data_type map per table (lowercased information_schema.data_type). Used by copyRowAsInsert to emit correct literals (numeric unquoted, json/jsonb cast, etc.).
+var colTypeCache = {};
+
+function parseColTypes(data) {
+  var map = {};
+  if (!data || !data.rows || !data.columns) return map;
+  var ni = data.columns.indexOf("column_name");
+  var ti = data.columns.indexOf("data_type");
+  if (ni < 0 || ti < 0) return map;
+  data.rows.forEach(function(row) {
+    if (typeof row[ni] === "string" && typeof row[ti] === "string") map[row[ni]] = row[ti].toLowerCase();
+  });
+  return map;
+}
+
+function fetchColTypes(table, cb) {
+  cb = cb || $.noop;
+  if (colTypeCache[table]) { cb(colTypeCache[table]); return; }
+  getTableStructure(table, { type: "table" }, function(data) {
+    colTypeCache[table] = (data && !data.error) ? parseColTypes(data) : {};
+    cb(colTypeCache[table]);
+  });
+}
+
 // Open the FK target table filtered to the referenced row ("col" = value).
 function openFkTarget(targetTable, targetColumn, value) {
   var $li = $("#objects li.schema-item").filter(function() {
@@ -2629,7 +2755,9 @@ function openFkTarget(targetTable, targetColumn, value) {
   showTableInfo();
 
   var name  = currentObject.name;
-  var where = '"' + targetColumn + '" ' + filterOptions["equal"].replace("DATA", value);
+  // Cast both sides to text — value comes from the source cell as a rendered string and the target column may be uuid/timestamptz/inet/etc. where implicit casts fail.
+  var where = value == null ? quoteIdent(targetColumn) + ' IS NULL' : quoteIdent(targetColumn) + "::text = '" + sqlEscapeStr(value) + "'";
+  rowsBrowseWhere = where;
   var opts  = { limit: getRowsLimit(), offset: 0, where: where };
   getTableRows(name, opts, function(data) {
     $("#input").hide();
@@ -2645,20 +2773,34 @@ function openFkTarget(targetTable, targetColumn, value) {
     updatePaginator(data.pagination);
     $("#results").data("mode", "browse").data("table", name);
     fetchFkMap(name, $.noop);
+    fetchColTypes(name);
   });
 }
 
-// Build an INSERT statement for a whole row and copy it to the clipboard 
+// Format a single value as a SQL literal using its information_schema data_type. Numeric types unquoted; booleans → TRUE/FALSE; json/jsonb get an explicit cast; everything else falls through to a plain 'string' literal which the user can refine after pasting.
+var NUMERIC_TYPES = { "smallint":1, "integer":1, "bigint":1, "decimal":1, "numeric":1, "real":1, "double precision":1, "money":1 };
+
+function sqlLiteralForValue(v, dataType) {
+  if (v === null) return "NULL";
+  var t = (dataType || "").toLowerCase();
+  if (NUMERIC_TYPES[t] && /^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(String(v).trim())) return String(v).trim();
+  if (t === "boolean") { var s = String(v).trim().toLowerCase(); if (s === "t" || s === "true") return "TRUE"; if (s === "f" || s === "false") return "FALSE"; }
+  if (t === "json" || t === "jsonb") return "'" + sqlEscapeStr(v) + "'::" + t;
+  return "'" + sqlEscapeStr(v) + "'";
+}
+
+// Build an INSERT statement for a whole row and copy it to the clipboard. Uses cached column types when available (warmed on browse load) so numeric/boolean/json values are formatted correctly; falls back to plain string literals otherwise.
 function copyRowAsInsert($tr) {
   var table = $("#results").data("table");
   if (!table) return;
+  var types = colTypeCache[table] || {};
   var cols = [], vals = [];
   $tr.children("td[data-name]").each(function() {
     var name = $(this).data("name");
     if (name == null) return;
     var v = cellValue($(this).children("div"));
-    cols.push('"' + name + '"');
-    vals.push(v === null ? "NULL" : "'" + String(v).replace(/'/g, "''") + "'");
+    cols.push(quoteIdent(name));
+    vals.push(sqlLiteralForValue(v, types[name]));
   });
   if (!cols.length) return;
   copyToClipboard("INSERT INTO " + getQuotedSchemaTableName(table) + " (" + cols.join(", ") + ") VALUES (" + vals.join(", ") + ");");
@@ -2709,6 +2851,16 @@ function bindContentModalEvents() {
   $("#results_row_menu").on("click", "a.export-fmt", function(e) {
     e.preventDefault();
     exportSelectedRows($(this).data("format"));
+  });
+
+  // Filter Rows submenu: same parent/child pattern as Export Selected.
+  $("#results_row_menu").on("click", ".filter-parent", function(e) {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  $("#results_row_menu").on("click", "a.filter-op", function(e) {
+    e.preventDefault();
+    applyRowFilter($(this).data("op"));
   });
 
   // Header "select all": if anything is selected (partial OR full) a click CLEARS
@@ -2965,6 +3117,7 @@ $(document).ready(function() {
     $(this).addClass("active");
     $(".current-page").data("page", 1);
     $(".filters select, .filters input").val("");
+    rowsBrowseWhere = null;
 
     if (currentObject.type == "function") {
       sessionStorage.setItem("tab", "table_structure");
@@ -3018,7 +3171,7 @@ $(document).ready(function() {
   });
 
   // Client-side quick filter of the current page (no server round-trip).
-  $("#rows_quickfilter").on("input", applyQuickFilter);
+  $("#rows_quickfilter").on("input", applyQuickFilterDebounced);
   $("#rows_quickfilter").on("keydown", function(e) {
     if (e.keyCode == 27) { $(this).val(""); applyQuickFilter(); }
   });
